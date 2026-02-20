@@ -17,23 +17,23 @@
 
 ### Shared Schema
 
-- [ ] **SCHEMA-01**: Shared Zod schema defines `NormalizedMessage` type (`id`, `role`, `kind: "text" | "adaptiveCard"`, `text?`, `cardJson?`, `cardId?`)
-- [ ] **SCHEMA-02**: Shared Zod schema defines request/response shapes for all three API endpoints
-- [ ] **SCHEMA-03**: Zod installed as a dependency of `shared/` only (single instance, not hoisted to client/server separately)
-- [ ] **SCHEMA-04**: TypeScript types inferred from Zod schemas and exported from `shared/` for use in client and server
+- [x] **SCHEMA-01**: Shared Zod schema defines `NormalizedMessage` type (`id`, `role`, `kind: "text" | "adaptiveCard"`, `text?`, `cardJson?`, `cardId?`)
+- [x] **SCHEMA-02**: Shared Zod schema defines request/response shapes for all three API endpoints
+- [x] **SCHEMA-03**: Zod installed as a dependency of `shared/` only (single instance, not hoisted to client/server separately)
+- [x] **SCHEMA-04**: TypeScript types inferred from Zod schemas and exported from `shared/` for use in client and server
 
 ### Server — Copilot Proxy
 
-- [ ] **SERV-01**: Express server with TypeScript running on Node 20+
+- [x] **SERV-01**: Express server with TypeScript running on Node 20+
 - [ ] **SERV-02**: `POST /api/chat/start` calls `CopilotStudioClient.startConversationStreaming()`, collects activities, returns `{ conversationId }`
 - [ ] **SERV-03**: `POST /api/chat/send` accepts `{ conversationId, text }`, calls `sendActivityStreaming()`, normalizes response, returns `{ conversationId, messages: NormalizedMessage[] }`
 - [ ] **SERV-04**: `POST /api/chat/card-action` accepts `{ conversationId, cardId, userSummary, submitData }`, validates `submitData.action` against allowlist, forwards to Copilot, returns normalized messages
-- [ ] **SERV-05**: `CopilotStudioClient` instantiated as a module-level singleton (server-side only, never in browser)
+- [x] **SERV-05**: `CopilotStudioClient` instantiated as a module-level singleton (server-side only, never in browser)
 - [ ] **SERV-06**: Response normalizer converts raw Copilot `Activity` objects to `NormalizedMessage[]`, stripping proprietary fields; handles hybrid turns (text + attachment in one activity)
 - [ ] **SERV-07**: Card action allowlist enforced server-side — rejects requests with disallowed `action` values before forwarding to Copilot
 - [ ] **SERV-08**: `Action.OpenUrl` domain allowlist enforced server-side
-- [ ] **SERV-09**: MSAL OBO token flow stubs with `TODO` comments showing where `tenantId`, `clientId`, `clientSecret`, and `scope` plug in; stubs must fail-closed (reject requests with a visible warning log, default `AUTH_REQUIRED=true`)
-- [ ] **SERV-10**: CORS configured for the client origin only (not wildcard)
+- [x] **SERV-09**: MSAL OBO token flow stubs with `TODO` comments showing where `tenantId`, `clientId`, `clientSecret`, and `scope` plug in; stubs must fail-closed (reject requests with a visible warning log, default `AUTH_REQUIRED=true`)
+- [x] **SERV-10**: CORS configured for the client origin only (not wildcard)
 - [ ] **SERV-11**: Unit tests for the response normalizer (text-only, card-only, hybrid turn cases)
 - [ ] **SERV-12**: Unit tests for the card action allowlist validator
 
@@ -111,11 +111,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-05 | Phase 1 | Complete |
 | INFRA-06 | Phase 1 | Complete |
 | INFRA-07 | Phase 4 | Pending |
-| SCHEMA-01 | Phase 1 | Pending |
-| SCHEMA-02 | Phase 1 | Pending |
-| SCHEMA-03 | Phase 1 | Pending |
-| SCHEMA-04 | Phase 1 | Pending |
-| SERV-01 | Phase 1 | Pending |
+| SCHEMA-01 | Phase 1 | Complete |
+| SCHEMA-02 | Phase 1 | Complete |
+| SCHEMA-03 | Phase 1 | Complete |
+| SCHEMA-04 | Phase 1 | Complete |
+| SERV-01 | Phase 1 | Complete |
 | SERV-02 | Phase 1 | Pending |
 | SERV-03 | Phase 2 | Pending |
 | SERV-04 | Phase 3 | Pending |
@@ -123,8 +123,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SERV-06 | Phase 2 | Pending |
 | SERV-07 | Phase 3 | Pending |
 | SERV-08 | Phase 3 | Pending |
-| SERV-09 | Phase 1 | Pending |
-| SERV-10 | Phase 1 | Pending |
+| SERV-09 | Phase 1 | Complete |
+| SERV-10 | Phase 1 | Complete |
 | SERV-11 | Phase 2 | Pending |
 | SERV-12 | Phase 3 | Pending |
 | UI-01 | Phase 3 | Pending |
@@ -155,4 +155,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-20 after plan 01-01 completion (INFRA-01 through INFRA-06 complete)*
+*Last updated: 2026-02-20 after plans 01-02 + 01-03 completion (SCHEMA-01–04, SERV-01, SERV-05, SERV-09, SERV-10 complete)*
