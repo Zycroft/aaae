@@ -47,7 +47,7 @@
 - [ ] **UI-06**: Adaptive Cards rendered via custom `useRef`/`useEffect` wrapper around the `adaptivecards` v3 JS SDK (not `adaptivecards-react`)
 - [ ] **UI-07**: `AdaptiveCardMessage` component hooks `onExecuteAction`, extracts `action.data`, and calls `/api/chat/card-action` with `userSummary` derived from `cardId`
 - [ ] **UI-08**: Submitted Adaptive Card is immediately disabled and shows a pending state; cannot be resubmitted
-- [ ] **UI-09**: `useChatApi` hook centralizes all fetch logic (start, send, cardAction) with retry on transient errors (network timeout, 5xx)
+- [x] **UI-09**: `useChatApi` hook centralizes all fetch logic (start, send, cardAction) with retry on transient errors (network timeout, 5xx)
 - [ ] **UI-10**: Transcript chip distinguishes user-typed messages from card-submit summaries
 - [ ] **UI-11**: Timeline sidebar (desktop only) lists completed card actions in chronological order
 - [ ] **UI-12**: Activity log download button exports the full conversation as a JSON file
@@ -135,7 +135,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-06 | Phase 3 | Pending |
 | UI-07 | Phase 3 | Pending |
 | UI-08 | Phase 3 | Pending |
-| UI-09 | Phase 2 | Pending |
+| UI-09 | Phase 2 | Complete |
 | UI-10 | Phase 3 | Pending |
 | UI-11 | Phase 4 | Pending |
 | UI-12 | Phase 4 | Pending |
