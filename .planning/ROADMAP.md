@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Monorepo scaffold: root config, TypeScript, ESLint/Prettier, workspace package.json files, .env.example files
+- [x] 01-01-PLAN.md — Monorepo scaffold: root config, TypeScript, ESLint/Prettier, workspace package.json files, .env.example files
 - [ ] 01-02-PLAN.md — Shared schemas (TDD): NormalizedMessage + API endpoint Zod schemas, types exported from shared/
 - [ ] 01-03-PLAN.md — Express server foundation: config validation, fail-closed auth middleware, CORS, ConversationStore + LRU impl
 - [ ] 01-04-PLAN.md — POST /api/chat/start: CopilotStudioClient singleton + route returning { conversationId }
@@ -79,7 +79,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Scaffold + Schema + Server Foundation | 0/4 | Planned | - |
+| 1. Scaffold + Schema + Server Foundation | 1/4 | Executing | - |
 | 2. Text Chat End-to-End | 0/TBD | Not started | - |
 | 3. Adaptive Cards + Accessibility + Theming | 0/TBD | Not started | - |
 | 4. Polish, Metadata Drawer, CI, and Docs | 0/TBD | Not started | - |

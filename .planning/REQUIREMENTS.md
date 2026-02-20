@@ -7,12 +7,12 @@
 
 ### Monorepo & Infrastructure
 
-- [ ] **INFRA-01**: Monorepo scaffold with npm workspaces: `client/`, `server/`, `shared/` directories
-- [ ] **INFRA-02**: TypeScript configured across all three workspaces
-- [ ] **INFRA-03**: `npm run dev` starts client and server concurrently via a root-level script
-- [ ] **INFRA-04**: `npm test` runs Jest (client) and Vitest (server) across both packages
-- [ ] **INFRA-05**: `.env.example` files exist for both `client/` and `server/` with all required placeholder variables (`COPILOT_TENANT_ID`, `COPILOT_APP_ID`, `COPILOT_AGENT_IDENTIFIER`, etc.)
-- [ ] **INFRA-06**: ESLint and Prettier configured and passing across all workspaces
+- [x] **INFRA-01**: Monorepo scaffold with npm workspaces: `client/`, `server/`, `shared/` directories
+- [x] **INFRA-02**: TypeScript configured across all three workspaces
+- [x] **INFRA-03**: `npm run dev` starts client and server concurrently via a root-level script
+- [x] **INFRA-04**: `npm test` runs Jest (client) and Vitest (server) across both packages
+- [x] **INFRA-05**: `.env.example` files exist for both `client/` and `server/` with all required placeholder variables (`COPILOT_TENANT_ID`, `COPILOT_APP_ID`, `COPILOT_AGENT_IDENTIFIER`, etc.)
+- [x] **INFRA-06**: ESLint and Prettier configured and passing across all workspaces
 - [ ] **INFRA-07**: GitHub Actions workflow runs lint + tests on push/PR for both packages
 
 ### Shared Schema
@@ -104,12 +104,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
-| INFRA-04 | Phase 1 | Pending |
-| INFRA-05 | Phase 1 | Pending |
-| INFRA-06 | Phase 1 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
+| INFRA-04 | Phase 1 | Complete |
+| INFRA-05 | Phase 1 | Complete |
+| INFRA-06 | Phase 1 | Complete |
 | INFRA-07 | Phase 4 | Pending |
 | SCHEMA-01 | Phase 1 | Pending |
 | SCHEMA-02 | Phase 1 | Pending |
@@ -155,4 +155,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-19 after roadmap creation (4-phase structure)*
+*Last updated: 2026-02-20 after plan 01-01 completion (INFRA-01 through INFRA-06 complete)*
