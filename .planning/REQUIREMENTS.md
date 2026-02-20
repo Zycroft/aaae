@@ -26,7 +26,7 @@
 
 - [x] **SERV-01**: Express server with TypeScript running on Node 20+
 - [x] **SERV-02**: `POST /api/chat/start` calls `CopilotStudioClient.startConversationStreaming()`, collects activities, returns `{ conversationId }`
-- [ ] **SERV-03**: `POST /api/chat/send` accepts `{ conversationId, text }`, calls `sendActivityStreaming()`, normalizes response, returns `{ conversationId, messages: NormalizedMessage[] }`
+- [x] **SERV-03**: `POST /api/chat/send` accepts `{ conversationId, text }`, calls `sendActivityStreaming()`, normalizes response, returns `{ conversationId, messages: NormalizedMessage[] }`
 - [ ] **SERV-04**: `POST /api/chat/card-action` accepts `{ conversationId, cardId, userSummary, submitData }`, validates `submitData.action` against allowlist, forwards to Copilot, returns normalized messages
 - [x] **SERV-05**: `CopilotStudioClient` instantiated as a module-level singleton (server-side only, never in browser)
 - [x] **SERV-06**: Response normalizer converts raw Copilot `Activity` objects to `NormalizedMessage[]`, stripping proprietary fields; handles hybrid turns (text + attachment in one activity)
@@ -117,7 +117,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHEMA-04 | Phase 1 | Complete |
 | SERV-01 | Phase 1 | Complete |
 | SERV-02 | Phase 1 | Complete |
-| SERV-03 | Phase 2 | Pending |
+| SERV-03 | Phase 2 | Complete |
 | SERV-04 | Phase 3 | Pending |
 | SERV-05 | Phase 1 | Pending |
 | SERV-06 | Phase 2 | Complete |
