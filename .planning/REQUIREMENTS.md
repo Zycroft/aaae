@@ -40,10 +40,10 @@
 ### Client — Chat UI
 
 - [ ] **UI-01**: Responsive layout using CSS grid/flex: split-pane (transcript + metadata drawer) on desktop ≥768px, stacked single column on mobile ≤767px; verified at 360px, 768px, 1280px
-- [ ] **UI-02**: Chat transcript renders text messages as user/assistant bubbles with role indicator
-- [ ] **UI-03**: Optimistic user message bubble appears immediately on send (before server response)
-- [ ] **UI-04**: Loading skeleton displayed while awaiting server response
-- [ ] **UI-05**: Error toast displayed on network or server error with actionable message
+- [x] **UI-02**: Chat transcript renders text messages as user/assistant bubbles with role indicator
+- [x] **UI-03**: Optimistic user message bubble appears immediately on send (before server response)
+- [x] **UI-04**: Loading skeleton displayed while awaiting server response
+- [x] **UI-05**: Error toast displayed on network or server error with actionable message
 - [ ] **UI-06**: Adaptive Cards rendered via custom `useRef`/`useEffect` wrapper around the `adaptivecards` v3 JS SDK (not `adaptivecards-react`)
 - [ ] **UI-07**: `AdaptiveCardMessage` component hooks `onExecuteAction`, extracts `action.data`, and calls `/api/chat/card-action` with `userSummary` derived from `cardId`
 - [ ] **UI-08**: Submitted Adaptive Card is immediately disabled and shows a pending state; cannot be resubmitted
@@ -128,10 +128,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SERV-11 | Phase 2 | Complete |
 | SERV-12 | Phase 3 | Pending |
 | UI-01 | Phase 3 | Pending |
-| UI-02 | Phase 2 | Pending |
-| UI-03 | Phase 2 | Pending |
-| UI-04 | Phase 2 | Pending |
-| UI-05 | Phase 2 | Pending |
+| UI-02 | Phase 2 | Complete |
+| UI-03 | Phase 2 | Complete |
+| UI-04 | Phase 2 | Complete |
+| UI-05 | Phase 2 | Complete |
 | UI-06 | Phase 3 | Pending |
 | UI-07 | Phase 3 | Pending |
 | UI-08 | Phase 3 | Pending |
@@ -155,4 +155,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-20 after plan 01-04 completion (SERV-02 complete; Phase 1 all 15 requirements done)*
+*Last updated: 2026-02-20 after plan 02-04 completion (UI-02, UI-03, UI-04, UI-05 complete; Phase 2 all 8 requirements done)*

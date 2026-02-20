@@ -13,7 +13,7 @@ Four phases deliver a production-ready React + Node monorepo that proxies Micros
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Scaffold + Schema + Server Foundation** - Monorepo wired, shared Zod schemas published, Express server with fail-closed auth stub and `/api/chat/start` returning a conversationId
-- [ ] **Phase 2: Text Chat End-to-End** - Full proxy chain working for plain-text conversations: client sends a message, server calls Copilot, normalizer converts activities, transcript renders user/bot bubbles with optimistic updates and error handling
+- [x] **Phase 2: Text Chat End-to-End** - Full proxy chain working for plain-text conversations: client sends a message, server calls Copilot, normalizer converts activities, transcript renders user/bot bubbles with optimistic updates and error handling
 - [ ] **Phase 3: Adaptive Cards + Accessibility + Theming** - Adaptive Cards rendered inline and interactive; card actions validated and proxied; full WCAG 2.2 AA accessibility; dark/light theme; responsive layout 360px to 1280px
 - [ ] **Phase 4: Polish, Metadata Drawer, CI, and Docs** - Timeline sidebar, activity log download, GitHub Actions CI with security checks, README, and Adaptive Cards playbook
 
@@ -50,10 +50,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Activity normalizer (TDD): normalizeActivities() pure function + Vitest tests covering text, card, hybrid turns
-- [ ] 02-02-PLAN.md — POST /api/chat/send route: validate body, call sendActivityStreaming, normalize, return NormalizedMessage[]
-- [ ] 02-03-PLAN.md — useChatApi hook + chatApi fetch layer: useReducer state, optimistic updates, 300ms skeleton delay, 3-attempt retry
-- [ ] 02-04-PLAN.md — React chat UI: ChatShell, TranscriptView, MessageBubble, SkeletonBubble, ChatInput, App.tsx updated
+- [x] 02-01-PLAN.md — Activity normalizer (TDD): normalizeActivities() pure function + Vitest tests covering text, card, hybrid turns
+- [x] 02-02-PLAN.md — POST /api/chat/send route: validate body, call sendActivityStreaming, normalize, return NormalizedMessage[]
+- [x] 02-03-PLAN.md — useChatApi hook + chatApi fetch layer: useReducer state, optimistic updates, 300ms skeleton delay, 3-attempt retry
+- [x] 02-04-PLAN.md — React chat UI: ChatShell, TranscriptView, MessageBubble, SkeletonBubble, ChatInput, App.tsx updated
 
 ### Phase 3: Adaptive Cards + Accessibility + Theming
 **Goal**: Adaptive Cards render inline in the transcript and submit card actions through the validated server proxy; the full UI meets WCAG 2.2 Level AA; dark/light theme and responsive layout work from 360px through 1280px
@@ -86,6 +86,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold + Schema + Server Foundation | 4/4 | Complete | 2026-02-20 |
-| 2. Text Chat End-to-End | 0/TBD | Not started | - |
+| 2. Text Chat End-to-End | 4/4 | Complete | 2026-02-20 |
 | 3. Adaptive Cards + Accessibility + Theming | 0/TBD | Not started | - |
 | 4. Polish, Metadata Drawer, CI, and Docs | 0/TBD | Not started | - |
