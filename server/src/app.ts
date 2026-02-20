@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
+import { chatRouter } from './routes/chat.js';
 
 export function createApp() {
   const app = express();
@@ -24,6 +25,9 @@ export function createApp() {
 
   // All /api routes require auth (SERV-09)
   app.use('/api', authMiddleware);
+
+  // Chat routes (SERV-02, SERV-03, SERV-04)
+  app.use('/api/chat', chatRouter);
 
   return app;
 }
