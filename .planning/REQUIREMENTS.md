@@ -29,12 +29,12 @@
 - [ ] **SERV-03**: `POST /api/chat/send` accepts `{ conversationId, text }`, calls `sendActivityStreaming()`, normalizes response, returns `{ conversationId, messages: NormalizedMessage[] }`
 - [ ] **SERV-04**: `POST /api/chat/card-action` accepts `{ conversationId, cardId, userSummary, submitData }`, validates `submitData.action` against allowlist, forwards to Copilot, returns normalized messages
 - [x] **SERV-05**: `CopilotStudioClient` instantiated as a module-level singleton (server-side only, never in browser)
-- [ ] **SERV-06**: Response normalizer converts raw Copilot `Activity` objects to `NormalizedMessage[]`, stripping proprietary fields; handles hybrid turns (text + attachment in one activity)
+- [x] **SERV-06**: Response normalizer converts raw Copilot `Activity` objects to `NormalizedMessage[]`, stripping proprietary fields; handles hybrid turns (text + attachment in one activity)
 - [ ] **SERV-07**: Card action allowlist enforced server-side — rejects requests with disallowed `action` values before forwarding to Copilot
 - [ ] **SERV-08**: `Action.OpenUrl` domain allowlist enforced server-side
 - [x] **SERV-09**: MSAL OBO token flow stubs with `TODO` comments showing where `tenantId`, `clientId`, `clientSecret`, and `scope` plug in; stubs must fail-closed (reject requests with a visible warning log, default `AUTH_REQUIRED=true`)
 - [x] **SERV-10**: CORS configured for the client origin only (not wildcard)
-- [ ] **SERV-11**: Unit tests for the response normalizer (text-only, card-only, hybrid turn cases)
+- [x] **SERV-11**: Unit tests for the response normalizer (text-only, card-only, hybrid turn cases)
 - [ ] **SERV-12**: Unit tests for the card action allowlist validator
 
 ### Client — Chat UI
@@ -120,12 +120,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SERV-03 | Phase 2 | Pending |
 | SERV-04 | Phase 3 | Pending |
 | SERV-05 | Phase 1 | Pending |
-| SERV-06 | Phase 2 | Pending |
+| SERV-06 | Phase 2 | Complete |
 | SERV-07 | Phase 3 | Pending |
 | SERV-08 | Phase 3 | Pending |
 | SERV-09 | Phase 1 | Complete |
 | SERV-10 | Phase 1 | Complete |
-| SERV-11 | Phase 2 | Pending |
+| SERV-11 | Phase 2 | Complete |
 | SERV-12 | Phase 3 | Pending |
 | UI-01 | Phase 3 | Pending |
 | UI-02 | Phase 2 | Pending |
