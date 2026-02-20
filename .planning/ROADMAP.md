@@ -47,7 +47,13 @@ Plans:
   3. The bot's text response appears as an assistant bubble with correct role styling after the server responds
   4. When the server returns a 5xx error or network timeout, an error toast appears with an actionable message and the failed request is retried automatically
   5. Unit tests for the response normalizer pass for text-only, card-only, and hybrid turn inputs
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Activity normalizer (TDD): normalizeActivities() pure function + Vitest tests covering text, card, hybrid turns
+- [ ] 02-02-PLAN.md — POST /api/chat/send route: validate body, call sendActivityStreaming, normalize, return NormalizedMessage[]
+- [ ] 02-03-PLAN.md — useChatApi hook + chatApi fetch layer: useReducer state, optimistic updates, 300ms skeleton delay, 3-attempt retry
+- [ ] 02-04-PLAN.md — React chat UI: ChatShell, TranscriptView, MessageBubble, SkeletonBubble, ChatInput, App.tsx updated
 
 ### Phase 3: Adaptive Cards + Accessibility + Theming
 **Goal**: Adaptive Cards render inline in the transcript and submit card actions through the validated server proxy; the full UI meets WCAG 2.2 Level AA; dark/light theme and responsive layout work from 360px through 1280px
