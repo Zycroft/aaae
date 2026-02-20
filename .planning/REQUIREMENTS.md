@@ -110,13 +110,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-04 | Phase 1 | Pending |
 | INFRA-05 | Phase 1 | Pending |
 | INFRA-06 | Phase 1 | Pending |
-| INFRA-07 | Phase 6 | Pending |
+| INFRA-07 | Phase 4 | Pending |
 | SCHEMA-01 | Phase 1 | Pending |
 | SCHEMA-02 | Phase 1 | Pending |
 | SCHEMA-03 | Phase 1 | Pending |
 | SCHEMA-04 | Phase 1 | Pending |
 | SERV-01 | Phase 1 | Pending |
-| SERV-02 | Phase 2 | Pending |
+| SERV-02 | Phase 1 | Pending |
 | SERV-03 | Phase 2 | Pending |
 | SERV-04 | Phase 3 | Pending |
 | SERV-05 | Phase 1 | Pending |
@@ -127,7 +127,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SERV-10 | Phase 1 | Pending |
 | SERV-11 | Phase 2 | Pending |
 | SERV-12 | Phase 3 | Pending |
-| UI-01 | Phase 4 | Pending |
+| UI-01 | Phase 3 | Pending |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 2 | Pending |
 | UI-04 | Phase 2 | Pending |
@@ -137,16 +137,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-08 | Phase 3 | Pending |
 | UI-09 | Phase 2 | Pending |
 | UI-10 | Phase 3 | Pending |
-| UI-11 | Phase 5 | Pending |
-| UI-12 | Phase 5 | Pending |
-| UI-13 | Phase 4 | Pending |
-| UI-14 | Phase 4 | Pending |
-| UI-15 | Phase 4 | Pending |
-| UI-16 | Phase 4 | Pending |
-| UI-17 | Phase 4 | Pending |
-| DOCS-01 | Phase 6 | Pending |
-| DOCS-02 | Phase 6 | Pending |
-| DOCS-03 | Phase 6 | Pending |
+| UI-11 | Phase 4 | Pending |
+| UI-12 | Phase 4 | Pending |
+| UI-13 | Phase 3 | Pending |
+| UI-14 | Phase 3 | Pending |
+| UI-15 | Phase 3 | Pending |
+| UI-16 | Phase 3 | Pending |
+| UI-17 | Phase 3 | Pending |
+| DOCS-01 | Phase 4 | Pending |
+| DOCS-02 | Phase 4 | Pending |
+| DOCS-03 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 43 total
@@ -155,4 +155,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-19*
-*Last updated: 2026-02-19 after initial definition*
+*Last updated: 2026-02-19 after roadmap creation (4-phase structure)*
