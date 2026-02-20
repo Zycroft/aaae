@@ -12,7 +12,7 @@ Four phases deliver a production-ready React + Node monorepo that proxies Micros
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Scaffold + Schema + Server Foundation** - Monorepo wired, shared Zod schemas published, Express server with fail-closed auth stub and `/api/chat/start` returning a conversationId
+- [x] **Phase 1: Scaffold + Schema + Server Foundation** - Monorepo wired, shared Zod schemas published, Express server with fail-closed auth stub and `/api/chat/start` returning a conversationId
 - [ ] **Phase 2: Text Chat End-to-End** - Full proxy chain working for plain-text conversations: client sends a message, server calls Copilot, normalizer converts activities, transcript renders user/bot bubbles with optimistic updates and error handling
 - [ ] **Phase 3: Adaptive Cards + Accessibility + Theming** - Adaptive Cards rendered inline and interactive; card actions validated and proxied; full WCAG 2.2 AA accessibility; dark/light theme; responsive layout 360px to 1280px
 - [ ] **Phase 4: Polish, Metadata Drawer, CI, and Docs** - Timeline sidebar, activity log download, GitHub Actions CI with security checks, README, and Adaptive Cards playbook
@@ -35,7 +35,7 @@ Plans:
 - [x] 01-01-PLAN.md — Monorepo scaffold: root config, TypeScript, ESLint/Prettier, workspace package.json files, .env.example files
 - [x] 01-02-PLAN.md — Shared schemas (TDD): NormalizedMessage + API endpoint Zod schemas, types exported from shared/
 - [x] 01-03-PLAN.md — Express server foundation: config validation, fail-closed auth middleware, CORS, ConversationStore + LRU impl
-- [ ] 01-04-PLAN.md — POST /api/chat/start: CopilotStudioClient singleton + route returning { conversationId }
+- [x] 01-04-PLAN.md — POST /api/chat/start: CopilotStudioClient singleton + route returning { conversationId }
 
 ### Phase 2: Text Chat End-to-End
 **Goal**: A user can open the app, start a conversation, type a message, and see a real Copilot Studio response rendered as a text bubble — with optimistic updates, loading state, and error handling working throughout
@@ -79,7 +79,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Scaffold + Schema + Server Foundation | 3/4 | Executing | - |
+| 1. Scaffold + Schema + Server Foundation | 4/4 | Complete | 2026-02-20 |
 | 2. Text Chat End-to-End | 0/TBD | Not started | - |
 | 3. Adaptive Cards + Accessibility + Theming | 0/TBD | Not started | - |
 | 4. Polish, Metadata Drawer, CI, and Docs | 0/TBD | Not started | - |
