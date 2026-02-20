@@ -1,3 +1,5 @@
+import { ChatShell } from './components/ChatShell';
+
 export default function App() {
-  return <div>Copilot Chat — Phase 1 scaffold</div>;
+  return <ChatShell />;
 }
