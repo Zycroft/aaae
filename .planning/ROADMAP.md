@@ -65,7 +65,14 @@ Plans:
   3. The layout is usable and unbroken at viewport widths of 360px, 768px, and 1280px — split-pane on desktop, single-column on mobile
   4. Toggling dark/light mode switches the theme and the preference persists across page reloads; `prefers-reduced-motion` disables all transitions when set
   5. All interactive elements are reachable and operable via keyboard alone; screen reader announces new messages via the ARIA live region on the transcript
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — POST /api/chat/card-action route + allowlist validator TDD (SERV-04, SERV-07, SERV-08, SERV-12)
+- [ ] 03-02-PLAN.md — CSS design tokens, dark/light theme, fluid typography, reduced-motion (UI-13, UI-14, UI-15)
+- [ ] 03-03-PLAN.md — Responsive split-pane layout: single-column mobile, split-pane desktop ≥768px (UI-01)
+- [ ] 03-04-PLAN.md — AdaptiveCardMessage component, cardAction hook, MessageBubble wired (UI-06, UI-07, UI-08, UI-10)
+- [ ] 03-05-PLAN.md — Accessibility hardening: ARIA live region, focus rings, keyboard navigation (UI-16, UI-17)
 
 ### Phase 4: Polish, Metadata Drawer, CI, and Docs
 **Goal**: The timeline sidebar and activity log download are functional; GitHub Actions runs lint and tests with credential-leak and Zod-instance checks; README and Adaptive Cards playbook give a new developer everything needed to run and extend the app
@@ -87,5 +94,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Scaffold + Schema + Server Foundation | 4/4 | Complete | 2026-02-20 |
 | 2. Text Chat End-to-End | 4/4 | Complete | 2026-02-20 |
-| 3. Adaptive Cards + Accessibility + Theming | 0/TBD | Not started | - |
+| 3. Adaptive Cards + Accessibility + Theming | 0/5 | Planned | - |
 | 4. Polish, Metadata Drawer, CI, and Docs | 0/TBD | Not started | - |
