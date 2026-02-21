@@ -159,14 +159,19 @@ async function fetchWithRetry<T>(
 /**
  * Central hook for all chat API interaction (UI-09).
  *
+ * Accepts a `getToken` function that acquires a valid Bearer token before each API call.
+ * Token acquisition failure is treated like a network error — shown in error state.
+ *
  * - Auto-starts a conversation on mount
  * - Manages transcript state via useReducer
  * - Dispatches optimistic user bubbles before fetch resolves
  * - Shows skeleton loading state after 300ms delay (avoids flicker on fast responses)
  * - Retries on 5xx / network errors (up to 3 attempts, exponential backoff)
  * - Dispatches inline error on the user bubble when all retries exhausted
+ *
+ * CAUTH-04, CAUTH-05, CAUTH-07
  */
-export function useChatApi() {
+export function useChatApi({ getToken }: { getToken: () => Promise<string> }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   // Stable ref to the abort controller so unmount cleanup can cancel in-flight requests
@@ -177,19 +182,24 @@ export function useChatApi() {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    startConversation(controller.signal)
-      .then((data) => {
+    void (async () => {
+      try {
+        const token = await getToken();
+        const data = await startConversation(token, controller.signal);
         dispatch({ type: 'INIT_CONVERSATION', conversationId: data.conversationId });
-      })
-      .catch((err: Error) => {
-        if (err.name !== 'AbortError') {
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error.name !== 'AbortError') {
           dispatch({ type: 'GLOBAL_ERROR', error: 'Failed to start conversation. Please refresh.' });
         }
-      });
+      }
+    })();
 
     return () => {
       controller.abort();
     };
+    // getToken is a stable useCallback ref from ChatShell — empty dep array is intentional
+    // (re-running on getToken changes would cause an infinite loop: mount → getToken → mount)
   }, []);
 
   /**
@@ -221,9 +231,10 @@ export function useChatApi() {
     abortRef.current = controller;
 
     try {
-      // 4. Fetch with retry
+      // 4. Acquire token then fetch with retry
+      const token = await getToken();
       const data = await fetchWithRetry(
-        (signal) => sendMessage(state.conversationId!, text.trim(), signal),
+        (signal) => sendMessage(state.conversationId!, text.trim(), token, signal),
         controller.signal,
       );
 
@@ -289,10 +300,11 @@ export function useChatApi() {
     abortRef.current = controller;
 
     try {
-      // 4. Fetch with retry
+      // 4. Acquire token then fetch with retry
+      const token = await getToken();
       const data = await fetchWithRetry(
         (signal) =>
-          sendCardAction(state.conversationId!, cardId, userSummary, submitData, signal),
+          sendCardAction(state.conversationId!, cardId, userSummary, submitData, token, signal),
         controller.signal,
       );
 

@@ -43,3 +43,22 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.2 Entra External ID Authentication (Shipped: 2026-02-21)
+
+**Phases completed:** 3 phases (5–7), 7 plans
+**Timeline:** 2026-02-20 → 2026-02-21
+**Git range:** 30c5918 → c14184e
+**Files changed:** 50 files, 4,886 insertions, 97 deletions
+**Requirements:** 24/24 complete
+
+**Key accomplishments:**
+1. UserClaims Zod schema in shared/ with sub/tid/oid (required) and email/name (optional) — single source of truth for decoded JWT claims across workspaces
+2. Fail-closed AZURE_CLIENT_ID guard — server exits at startup if AUTH_REQUIRED=true but credentials are missing; AUTH_REQUIRED=false bypass preserved for local dev
+3. JWT validation middleware using jose with JWKS caching — typed error handling for expired, wrong-audience, wrong-issuer, and unsigned tokens (401 + WWW-Authenticate)
+4. Synchronous org allowlist middleware — checks tenant ID against ALLOWED_TENANT_IDS with fail-closed behavior (empty allowlist denies all), 403 on disallowed tenants
+5. MSAL React sign-in gate with AuthGuard 3-phase state machine (skeleton → sign-in → chat), sessionStorage token cache, pinned to @azure/msal-react v3.x for React 18 compatibility
+6. Bearer token injection on all chat API endpoints with silent token acquisition (acquireTokenSilent + loginRedirect fallback) and sign-out button clearing MSAL cache
+
+---
+

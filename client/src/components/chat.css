@@ -179,11 +179,40 @@ body {
    Theme Toggle (UI-13)
    ───────────────────────────────────────────────────────────────────────────── */
 
+/* ── Chat header — contains ThemeToggle and Sign-out button ─────────────── */
+.chatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  flex-shrink: 0;
+}
+
+/* Sign-out button in chat header */
+.signOutButton {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+  transition: color var(--transition-base), border-color var(--transition-base);
+}
+
+.signOutButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.signOutButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .themeToggle {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-4);
-  z-index: 10;
+  position: static;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -631,5 +660,105 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Auth UI — Sign-in page, auth check skeleton, welcome toast
+   CAUTH-01, CAUTH-02, CAUTH-03
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Auth check layout — shows skeleton during MSAL init/redirect */
+.authCheckLayout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+}
+
+/* Sign-in page — centered card */
+.signInLayout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--color-bg);
+}
+
+.signInCard {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-5) 40px;
+  text-align: center;
+  max-width: 360px;
+  width: 100%;
+}
+
+.signInTitle {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.signInSubtitle {
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-5) 0;
+}
+
+.signInButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 4px;
+  padding: 10px 24px;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color var(--transition-base);
+}
+
+.signInButton:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.signInButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Welcome toast — brief notification after sign-in redirect */
+.welcomeToast {
+  position: fixed;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  animation: welcomeFadeIn 0.2s ease;
+}
+
+@keyframes welcomeFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* prefers-reduced-motion: disable fade animation per v1.0 accessibility pattern */
+@media (prefers-reduced-motion: reduce) {
+  .welcomeToast {
+    animation: none;
   }
 }

@@ -4,6 +4,10 @@ import type { NormalizedMessage } from '@copilot-chat/shared';
  * Raw HTTP fetch wrappers for the chat API.
  * No state, no retry logic — those live in useChatApi.
  * The Vite dev server proxies /api to http://localhost:3001 (configured in vite.config.ts).
+ *
+ * Each function accepts a `token` string and injects it as the Authorization: Bearer header.
+ * Token acquisition is the responsibility of the caller (ChatShell via useMsal).
+ * CAUTH-05
  */
 
 /**
@@ -11,10 +15,16 @@ import type { NormalizedMessage } from '@copilot-chat/shared';
  * Returns { conversationId: string }.
  * Throws with status property preserved on non-ok responses.
  */
-export async function startConversation(signal?: AbortSignal): Promise<{ conversationId: string }> {
+export async function startConversation(
+  token: string,
+  signal?: AbortSignal,
+): Promise<{ conversationId: string }> {
   const response = await fetch('/api/chat/start', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     signal,
   });
 
@@ -36,11 +46,15 @@ export async function startConversation(signal?: AbortSignal): Promise<{ convers
 export async function sendMessage(
   conversationId: string,
   text: string,
+  token: string,
   signal?: AbortSignal,
 ): Promise<{ conversationId: string; messages: NormalizedMessage[] }> {
   const response = await fetch('/api/chat/send', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify({ conversationId, text }),
     signal,
   });
@@ -67,11 +81,15 @@ export async function sendCardAction(
   cardId: string,
   userSummary: string,
   submitData: Record<string, unknown>,
+  token: string,
   signal?: AbortSignal,
 ): Promise<{ conversationId: string; messages: NormalizedMessage[] }> {
   const response = await fetch('/api/chat/card-action', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
     body: JSON.stringify({ conversationId, cardId, userSummary, submitData }),
     signal,
   });

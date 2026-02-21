@@ -1,5 +1,10 @@
-import { ChatShell } from './components/ChatShell';
+import { ChatShell } from './components/ChatShell.js';
+import { AuthGuard } from './auth/AuthGuard.js';
 
 export default function App() {
-  return <ChatShell />;
+  return (
+    <AuthGuard>
+      <ChatShell />
+    </AuthGuard>
+  );
 }

@@ -2,15 +2,17 @@
 
 ## What This Is
 
-A production-ready monorepo (React + Node) that delivers a responsive chat experience powered by Microsoft Copilot Studio (Microsoft 365 Agents SDK) and Adaptive Cards. Users can have free-form text conversations and submit structured Adaptive Card forms, with all Copilot Studio calls proxied through the Node server so secrets never reach the browser.
+A production-ready monorepo (React + Node) that delivers a responsive, authenticated chat experience powered by Microsoft Copilot Studio (Microsoft 365 Agents SDK) and Adaptive Cards. Users sign in via Entra External ID, then have free-form text conversations and submit structured Adaptive Card forms, with all Copilot Studio calls proxied through the Node server so secrets never reach the browser.
 
 v1.0 (MVP) shipped 2026-02-20: full text chat and interactive Adaptive Cards working end-to-end, WCAG 2.2 AA accessible, dark/light theme, responsive from 360px through 1280px.
 
 v1.1 (Polish) shipped 2026-02-20: metadata sidebar with activity timeline and JSON download, GitHub Actions CI with credential-leak and Zod-instance checks, README quick start, and Adaptive Cards authoring playbook.
 
+v1.2 (Auth) shipped 2026-02-21: Entra External ID (CIAM) authentication via MSAL React on the client and JWT validation + org allowlist on the server. UserClaims Zod schema in shared/, fail-closed config, AUTH_REQUIRED=false dev bypass preserved.
+
 ## Core Value
 
-Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected.
+Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
 
 ## Requirements
 
@@ -34,7 +36,6 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ Response normalizer: Activity[] → NormalizedMessage[] with hybrid turn support — v1.0
 - ✓ Card action allowlist enforcement server-side (rejects disallowed actions) — v1.0
 - ✓ Action.OpenUrl domain allowlist enforced server-side — v1.0
-- ✓ MSAL OBO token stubs (fail-closed, AUTH_REQUIRED=true default) — v1.0
 - ✓ CORS configured for client origin only — v1.0
 - ✓ Unit tests for response normalizer (text, card, hybrid) — v1.0
 - ✓ Unit tests for card action allowlist validator — v1.0
@@ -59,6 +60,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ README: monorepo quick start, full env var table (10 vars), project structure, security notes — v1.1
 - ✓ docs/adaptive-card-playbook.md: 4-step card registration guide, allowlist wiring, test pattern — v1.1
 - ✓ docs/cards/feedback-survey.json: sample Adaptive Card v1.5 with ChoiceSet and Action.Submit — v1.1
+<<<<<<< HEAD
 - ✓ Shared auth types (UserClaims schema) in shared/ — v1.2 Phase 5
 - ✓ AUTH_REQUIRED=false bypass preserved for local dev — v1.2 Phase 5
 - ✓ Environment variables documented in .env.example files — v1.2 Phase 5
@@ -73,6 +75,21 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - [ ] Client authenticates users via MSAL React against Entra External ID (CIAM)
 - [ ] Sign-out clears MSAL cache and returns to sign-in page
 - [ ] Token refresh happens silently (no mid-conversation logouts)
+=======
+- ✓ Shared auth types (UserClaims schema) in shared/ — v1.2
+- ✓ AUTH_REQUIRED=false bypass preserved for local dev — v1.2
+- ✓ Environment variables documented in .env.example files — v1.2
+- ✓ Server validates JWT access tokens (signature, audience, issuer, expiry) — v1.2
+- ✓ Org Allowlist blocks requests from disallowed tenants (403) — v1.2
+- ✓ Unit tests for JWT validation and Org Allowlist middleware — v1.2
+- ✓ Client authenticates users via MSAL React against Entra External ID (CIAM) — v1.2
+- ✓ Sign-out clears MSAL cache and returns to sign-in page — v1.2
+- ✓ Token refresh happens silently (no mid-conversation logouts) — v1.2
+
+### Active
+
+*No active requirements — next milestone not yet defined. Use `/gsd:new-milestone` to start.*
+>>>>>>> gsd/phase-07-client-msal-authentication
 
 ### Out of Scope
 
@@ -86,38 +103,19 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - Markdown rendering in text messages — v2 (CARD-01)
 - Quick-reply chips from suggestedActions — v2 (CARD-02)
 
-## Current Milestone: v1.2 Entra External ID Authentication (MSAL)
-
-**Goal:** Add real user authentication via Entra External ID (CIAM) using MSAL React on the client and JWT validation on the server, replacing the v1 auth stubs.
-
-**Target features:**
-- MSAL React sign-in/sign-out with Entra External ID (CIAM)
-- Server JWT validation (signature, audience, issuer, expiry) via JWKS
-- Org Allowlist middleware (tenant ID check against env var allowlist)
-- Shared UserClaims Zod schema
-- AUTH_REQUIRED=false local dev bypass preserved
-
 ## Context
 
-**Shipped v1.1 (2026-02-20):** 4 phases, 16 plans total — Phase 4 adds MetadataPane, GitHub Actions CI, README, and Adaptive Cards playbook
-
-**Shipped v1.0 (2026-02-20):** 3 phases, 13 plans, ~2,341 LOC TypeScript/JS, 91 files
+**Current state (v1.2):** 7 phases, 23 plans shipped across 3 milestones. ~50 files changed in v1.2 alone. Full MSAL auth flow working end-to-end: sign-in → token acquisition → Bearer header injection → JWT validation → org allowlist → Copilot proxy.
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
-- Client: Vite + React 18 + TypeScript
-- Server: Express + Node 20+ + TypeScript
-- Shared: Zod schemas as single source of truth for types
+- Client: Vite + React 18 + TypeScript + MSAL React v3.x
+- Server: Express + Node 20+ + TypeScript + jose (JWT validation)
+- Shared: Zod schemas as single source of truth for types (including UserClaims)
+- Auth: Entra External ID (CIAM) via @azure/msal-browser + @azure/msal-react
 - Adaptive Cards: `adaptivecards` v3 JS SDK with custom React wrapper (not `adaptivecards-react`)
 
-**Key findings from v1.0:**
-- `adaptivecards-react` abandoned — React 18 incompatible; custom `useRef`/`useEffect` wrapper works well
-- `CopilotStudioConnectionSettings` requires explicit fields (not `loadFromEnv()`); `externalId = uuidv4()` as client-facing conversationId
-- Zod single-instance pattern (declared in `shared/` only) confirmed working; `npm ls zod` shows one instance
-- MSAL OBO stubs are fail-closed by design; `AUTH_REQUIRED=true` is the safe default
-- ESLint missing `@react-eslint` plugin for JSX type inference — non-blocking, no runtime impact (tech debt for v1.1)
-
-**Tech debt carried into v2:**
+**Tech debt carried into next milestone:**
 - Missing VERIFICATION.md for Phases 1 & 3 (all code verified functionally; documentation gap only)
 - ESLint JSX plugin missing — non-blocking, 3 pre-existing errors in AdaptiveCardMessage.tsx and ChatInput.tsx
 
@@ -126,6 +124,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - **Tech Stack**: React 18 + Vite, Node 20+, Express, TypeScript throughout — no switching to Next.js SSR
 - **Security**: Copilot Studio client must never be invoked from the browser; all calls server-side
 - **Compatibility**: Adaptive Cards version 1.5 format; must support mobile (360px) through widescreen (1280px+)
+- **Auth**: @azure/msal-react pinned to v3.x until React 19 migration
 
 ## Key Decisions
 
@@ -136,19 +135,32 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | Express over Fastify | Wider ecosystem familiarity; simpler middleware for auth stubs | ✓ Good — no friction during implementation |
 | Card action allowlist enforcement | Security — prevent arbitrary actions from Adaptive Card payloads | ✓ Good — 403 on disallowed actions verified in UAT |
 | Custom adaptivecards v3 wrapper (not adaptivecards-react) | adaptivecards-react is React 18 incompatible | ✓ Good — custom useRef/useEffect wrapper worked cleanly |
-| MSAL OBO stubs fail-closed | Security baseline for v1; real OBO deferred to v2 | ✓ Good — AUTH_REQUIRED=true default enforced |
 | CSS custom properties for theming | Runtime theme switching without JS overhead | ✓ Good — dark/light toggle + localStorage persistence works |
 | COPILOT_[A-Z_]*= grep pattern for CI | Catches credential assignments without false-positiving on code identifiers | ✓ Good — correctly distinguishes COPILOT_TENANT_ID= from CopilotStudioClient |
 | npm ls zod --depth=Infinity | Enforces single Zod instance across full workspace tree, not just direct deps | ✓ Good — would catch hoisted duplicates that --depth=0 would miss |
 | MetadataPane as prop-receiving component | No new hook needed; ChatShell already owns message state | ✓ Good — clean composition, simple to test |
+<<<<<<< HEAD
 
 | Entra External ID (CIAM) over standard Entra ID | CIAM uses `ciamlogin.com` authority URLs; designed for customer-facing apps | — Pending |
+=======
+| Entra External ID (CIAM) over standard Entra ID | CIAM uses `ciamlogin.com` authority URLs; designed for customer-facing apps | ✓ Good — clean separation from internal tenant |
+>>>>>>> gsd/phase-07-client-msal-authentication
 | oid required in UserClaims (not optional) | Stable Azure AD object ID always present in Entra External ID tokens | ✓ Good — needed for user identity in JWT middleware |
 | Fail-closed AZURE_CLIENT_ID guard at startup | process.exit(1) when AUTH_REQUIRED=true but AZURE_CLIENT_ID missing | ✓ Good — no silent passthrough possible |
 | ALLOWED_TENANT_IDS parsed to string[] at config load | Avoids repeated split in middleware; filter(Boolean) removes empty strings | ✓ Good — clean for Phase 6 consumption |
 | jose over jsonwebtoken+jwks-rsa | Pure ESM, built-in JWKS caching/rotation, typed errors map to our error codes | ✓ Good — v6 errors namespace needed adaptation but clean |
 | createRemoteJWKSet called once at module load | jose handles JWKS caching and key rotation internally | ✓ Good — no per-request overhead |
 | Synchronous orgAllowlist middleware | Array.includes on in-memory string[] — no async needed | ✓ Good — simple and fast |
+<<<<<<< HEAD
 
 ---
 *Last updated: 2026-02-21 after Phase 6*
+=======
+| @azure/msal-react v3.x (not v5) | v5 requires React 19; v3.0.26 is last React 18-compatible release | ✓ Good — pinned, no upgrade needed until React 19 migration |
+| sessionStorage for MSAL token cache | Tokens tab-scoped, cleared on tab close; safer than localStorage | ✓ Good — no cross-tab leakage |
+| AuthGuard 3-phase state machine | Skeleton → SignIn → Chat; checks InteractionStatus.None before rendering | ✓ Good — prevents redirect loops |
+| Token-as-parameter pattern for chatApi | chatApi functions accept token string; acquisition stays in ChatShell | ✓ Good — clean separation, hook stays testable |
+
+---
+*Last updated: 2026-02-21 after v1.2 milestone archived*
+>>>>>>> gsd/phase-07-client-msal-authentication

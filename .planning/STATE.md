@@ -4,6 +4,7 @@
 
 See: .planning/PROJECT.md (updated 2026-02-21)
 
+<<<<<<< HEAD
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected.
 **Current focus:** v1.2 Entra External ID Authentication (MSAL) — Phase 7 (Client MSAL Authentication)
 
@@ -21,6 +22,27 @@ Progress: [████████████████████] 4/4 v1.
 **v1.2 Velocity (in progress):**
 - Plans completed: 4 (Phase 5: plans 01, 02; Phase 6: plans 01, 02)
 - Timeline: 2026-02-21
+=======
+**Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
+**Current focus:** Planning next milestone
+
+## Current Position
+
+Phase: 7 of 7 — all milestones complete (v1.0, v1.1, v1.2)
+Plan: N/A — between milestones
+Status: v1.2 archived, next milestone pending
+Last activity: 2026-02-21 — v1.2 milestone archived
+
+Progress: [████████████████████] v1.0–v1.2 complete (23 plans shipped)
+
+## Performance Metrics
+
+**v1.2 Velocity (complete):**
+- Plans completed: 7 (Phase 5: 2, Phase 6: 2, Phase 7: 3)
+- Timeline: 2026-02-20 to 2026-02-21
+- Requirements: 24/24 fulfilled
+- Files: 50 changed, 4,886 insertions
+>>>>>>> gsd/phase-07-client-msal-authentication
 
 **v1.1 Velocity:**
 - Total plans completed: 3 (Phase 4)
@@ -32,13 +54,12 @@ Progress: [████████████████████] 4/4 v1.
 - Timeline: 1 day (2026-02-19 → 2026-02-20)
 - Files: 91 changed, ~2,341 LOC TypeScript/JS
 
-*Updated after each plan completion*
-
 ## Accumulated Context
 
 ### Decisions
 
 All decisions logged in PROJECT.md Key Decisions table.
+<<<<<<< HEAD
 Recent decisions affecting current work:
 
 - CIAM authority URLs use `ciamlogin.com`, not `login.microsoftonline.com` — affects MSAL config in Phase 7
@@ -55,6 +76,8 @@ Recent decisions affecting current work:
 - [Phase 06-02]: orgAllowlist is synchronous — Array.includes on in-memory string[] needs no async/await
 - [Phase 06-02]: No WWW-Authenticate header on 403 — only 401 uses that per RFC 6750
 - [Phase 06-02]: Denial logs include tid (tenant identifier, not PII) only — email/name never logged
+=======
+>>>>>>> gsd/phase-07-client-msal-authentication
 
 ### Pending Todos
 
@@ -64,10 +87,17 @@ None.
 
 - ESLint missing @react-eslint plugin — pre-existing tech debt, non-blocking
 - 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt, non-blocking
+<<<<<<< HEAD
 - MSAL acquireTokenSilent may need explicit account hint to avoid interaction_required errors in Phase 7
+=======
+>>>>>>> gsd/phase-07-client-msal-authentication
 
 ## Session Continuity
 
 Last session: 2026-02-21
+<<<<<<< HEAD
 Stopped at: Phase 6 complete, ready to plan Phase 7
+=======
+Stopped at: v1.2 milestone archived — ready for /gsd:new-milestone
+>>>>>>> gsd/phase-07-client-msal-authentication
 Resume file: None
