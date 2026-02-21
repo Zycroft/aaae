@@ -9,10 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-21)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 8 — SDK Capability Audit + Structured Extraction
 Plan: —
-Status: Defining requirements
-Last activity: 2026-02-21 — Milestone v1.3b started
+Status: Roadmap defined, ready to plan Phase 8
+Last activity: 2026-02-21 — v1.3b roadmap created (Phases 8–10)
+
+Progress: [░░░░░░░░░░] Phase 8 not started
 
 ## Performance Metrics
 
@@ -38,6 +40,13 @@ Last activity: 2026-02-21 — Milestone v1.3b started
 
 All decisions logged in PROJECT.md Key Decisions table.
 
+### v1.3b Constraints (carry forward into all plans)
+
+- Do NOT modify existing routes (/api/chat/start, /api/chat/send, /api/chat/card-action) in a breaking way — v1.1 behavior must remain intact
+- Do NOT mock Copilot responses for structured output or context injection tests — must use real Copilot Studio agent
+- Spike artifacts (latency measurements, evaluation notes) go in spike/; production code in server/src/
+- All existing tests must continue to pass after each phase
+
 ### Pending Todos
 
 None.
@@ -50,5 +59,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: v1.3b milestone started — defining requirements
+Stopped at: v1.3b roadmap created — Phase 8 ready to plan
 Resume file: None
+Next step: /gsd:plan-phase 8
