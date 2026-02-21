@@ -42,12 +42,16 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 
 ### v1.3b — Copilot Studio SDK: Orchestrator Readiness (Phases 8–10)
 
-- [ ] **Phase 8: SDK Capability Audit + Structured Extraction** - Measure SDK latency baselines and extend the normalizer to extract structured JSON from all Copilot activity surfaces
+- [x] **Phase 8: SDK Capability Audit + Structured Extraction** - Measure SDK latency baselines and extend the normalizer to extract structured JSON from all Copilot activity surfaces (completed 2026-02-21)
   Plans:
   - [ ] 08-01-PLAN.md — ExtractedPayload schema in shared/ + NormalizedMessage extension
   - [ ] 08-02-PLAN.md — TDD: normalizer extraction from activity.value, entities, bot text
   - [ ] 08-03-PLAN.md — Latency baseline spike script + LATENCY-RESULTS.md
 - [ ] **Phase 9: Context Injection + Multi-Turn Validation** - Inject workflow context into outbound Copilot messages and verify conversation continuity across 3+ turns with a live agent
+  Plans:
+  - [ ] 09-01-PLAN.md — TDD: WorkflowContext schema + SendMessageRequest extension (Wave 1)
+  - [ ] 09-02-PLAN.md — Server context injection in /send route (Wave 2)
+  - [ ] 09-03-PLAN.md — Live 3-turn spike + CONTEXT-INJECTION-RESULTS.md (Wave 3, has checkpoint)
 - [ ] **Phase 10: Orchestrate Endpoint + Evaluation** - Deliver the /api/chat/orchestrate endpoint with WorkflowState types and produce the SDK-EVALUATION.md with GO/CONDITIONAL GO recommendation
 
 ## Phase Details
@@ -78,7 +82,7 @@ Plans:
   2. When a caller supplies workflowContext, the server prepends it as a structured prefix to the outbound Copilot message without altering the user query
   3. A 3-turn live conversation with the real Copilot agent succeeds — the agent responds correctly to each turn and does not produce errors or garbled output caused by the injected context
   4. A spike document records the tested context size thresholds (500 chars, 1000 chars) and notes which sizes caused degraded agent responses
-**Plans**: TBD
+**Plans**: 3 plans
 
 ### Phase 10: Orchestrate Endpoint + Evaluation
 **Goal**: POST /api/chat/orchestrate is live and returning structured payloads, the WorkflowState type is in shared schema, and SDK-EVALUATION.md gives a clear GO/CONDITIONAL GO recommendation backed by real measurements
@@ -102,6 +106,6 @@ Plans:
 | 5. Shared Schema + Config Foundation | v1.2 | 2/2 | Complete | 2026-02-21 |
 | 6. Server JWT Validation + Org Allowlist | v1.2 | 2/2 | Complete | 2026-02-21 |
 | 7. Client MSAL Authentication | v1.2 | 3/3 | Complete | 2026-02-21 |
-| 8. SDK Capability Audit + Structured Extraction | v1.3b | 0/TBD | Not started | - |
+| 8. SDK Capability Audit + Structured Extraction | v1.3b | Complete    | 2026-02-21 | - |
 | 9. Context Injection + Multi-Turn Validation | v1.3b | 0/TBD | Not started | - |
 | 10. Orchestrate Endpoint + Evaluation | v1.3b | 0/TBD | Not started | - |

@@ -12,6 +12,13 @@ export {
 } from './schemas/message.js';
 
 export {
+  ExtractedPayloadSchema,
+  ExtractionConfidenceSchema,
+  type ExtractedPayload,
+  type ExtractionConfidence,
+} from './schemas/extractedPayload.js';
+
+export {
   UserClaimsSchema,
   type UserClaims,
 } from './schemas/auth.js';

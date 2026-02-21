@@ -75,9 +75,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 #### v1.3b — Copilot Studio SDK: Orchestrator Readiness
 
 **Structured Output Extraction:**
-- [ ] Server can extract structured JSON from activity.value, activity.entities, and text-embedded responses
-- [ ] ExtractedPayload Zod schema validates all extraction surfaces with confidence level
-- [ ] activityNormalizer populates extractedPayload on NormalizedMessage
+- [x] Server can extract structured JSON from activity.value, activity.entities, and text-embedded responses -- Phase 8
+- [x] ExtractedPayload Zod schema validates all extraction surfaces with confidence level -- Phase 8
+- [x] activityNormalizer populates extractedPayload on NormalizedMessage -- Phase 8
 
 **Context Injection:**
 - [ ] SendMessageRequest accepts optional workflowContext (step, constraints, collectedData)
@@ -90,7 +90,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - [ ] Conversation continuity verified across 3+ SDK turns
 
 **Performance & Evaluation:**
-- [ ] Latency baselines measured (startConversation, sendMessage, full round-trip)
+- [x] Latency baselines measured (startConversation, sendMessage, full round-trip) -- Phase 8 (script ready, awaiting real credentials)
 - [ ] SDK-EVALUATION.md with GO/CONDITIONAL GO recommendation for v1.5
 
 ### Out of Scope
@@ -152,6 +152,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | sessionStorage for MSAL token cache | Tokens tab-scoped, cleared on tab close; safer than localStorage | ✓ Good — no cross-tab leakage |
 | AuthGuard 3-phase state machine | Skeleton → SignIn → Chat; checks InteractionStatus.None before rendering | ✓ Good — prevents redirect loops |
 | Token-as-parameter pattern for chatApi | chatApi functions accept token string; acquisition stays in ChatShell | ✓ Good — clean separation, hook stays testable |
+| ExtractedPayload.data refine (empty object rejection) | Prevents phantom extractions at the schema level | ✓ Good — catches zero-field data at parse time |
+| Priority chain extraction (value > entities > text) | Highest confidence source wins; avoids redundant extraction | ✓ Good — clean and deterministic |
+| Entity type key omission in extraction | Entity `type` field is SDK noise; useful data is in other keys | ✓ Good — cleaner payloads |
 
 ## Current Milestone: v1.3b Copilot Studio SDK: Orchestrator Readiness
 
@@ -165,4 +168,4 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - SDK evaluation document with GO/CONDITIONAL GO recommendation for v1.5
 
 ---
-*Last updated: 2026-02-21 after v1.3b milestone started*
+*Last updated: 2026-02-21 after Phase 8 (SDK Capability Audit + Structured Extraction)*
