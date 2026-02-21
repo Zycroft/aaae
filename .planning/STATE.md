@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-20 after v1.0 milestone)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected.
-**Current focus:** Planning next milestone (v1.1 Polish — Phase 4)
+**Current focus:** Phase 4 complete — verify and transition
 
 ## Current Position
 
-Milestone: v1.0 MVP — COMPLETE (shipped 2026-02-20)
-Phases 1–3: all 13 plans done, 37 requirements satisfied
-Status: v1.0 archived; ready to plan v1.1 (Phase 4)
-Last activity: 2026-02-20 — v1.0 milestone archived; ROADMAP.md reorganized; PROJECT.md evolved
+Milestone: v1.1 Polish — Phase 4 COMPLETE (2026-02-20)
+Phase 4: 3/3 plans done (04-01 MetadataPane, 04-02 CI, 04-03 Docs)
+Requirements satisfied: UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03
+Last activity: 2026-02-20 — Phase 4 execution complete
 
-Progress: [██████████] 100% v1.0 complete (3/3 phases, 13/13 plans)
+Progress: [██████████] 100% Phase 4 complete (3/3 plans)
 
 ## Performance Metrics
 
@@ -30,6 +30,7 @@ Progress: [██████████] 100% v1.0 complete (3/3 phases, 13/13
 | Phase 1 | 4/4 | Complete |
 | Phase 2 | 4/4 | Complete |
 | Phase 3 | 5/5 | Complete |
+| Phase 4 | 3/3 | Complete |
 
 ## Accumulated Context
 
@@ -47,15 +48,21 @@ Key outcomes from v1.0:
 
 None.
 
+### Decisions
+
+Phase 4 decisions:
+- MetadataPane receives messages prop from ChatShell (no new hook needed)
+- CI credential pattern COPILOT_[A-Z_]*= catches assignments only (avoids false positives)
+- npm ls zod --depth=Infinity enforces single Zod instance across full workspace tree
+- README env var table expanded to all 10 vars from actual .env.example files
+
 ### Blockers/Concerns
 
-Carried into v1.1:
-- Missing VERIFICATION.md for Phases 1 & 3 (functional verification done via Phase 2 VERIFICATION.md + Phase 3 UAT; documentation gap only — acceptable as known gap)
-- Metadata drawer `aside.metadataPane` is a placeholder — Phase 4 work (UI-11, UI-12)
-- ESLint missing @react-eslint plugin for JSX type inference — non-blocking, no runtime impact
+- ESLint missing @react-eslint plugin for JSX type inference — non-blocking, pre-existing
+- 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: v1.0 milestone COMPLETE. Phase 4 planning next.
+Stopped at: Phase 4 execution complete — 3/3 plans done. Verification next.
 Resume file: None
