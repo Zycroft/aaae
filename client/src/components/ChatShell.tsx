@@ -4,6 +4,7 @@ import { useTheme } from '../hooks/useTheme.js';
 import { TranscriptView } from './TranscriptView.js';
 import { ChatInput } from './ChatInput.js';
 import { ThemeToggle } from './ThemeToggle.js';
+import { MetadataPane } from './MetadataPane.js';
 
 /**
  * Top-level chat UI shell.
@@ -28,10 +29,8 @@ export function ChatShell() {
           <ChatInput onSend={sendMessage} disabled={isLoading} />
         </div>
       </div>
-      {/* Right column: Phase 4 metadata drawer slot — empty placeholder in Phase 3 */}
-      <aside className="metadataPane" aria-label="Metadata panel">
-        <p className="metadataPanePlaceholder">Activity log (Phase 4)</p>
-      </aside>
+      {/* Phase 4: metadata drawer — UI-11, UI-12 */}
+      <MetadataPane messages={messages} />
     </div>
   );
 }

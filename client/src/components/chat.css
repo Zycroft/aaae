@@ -545,6 +545,82 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   Metadata Pane — Activity Timeline (UI-11, UI-12)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.metadataPaneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-2);
+}
+
+.metadataPaneTitle {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.downloadButton {
+  font-size: var(--font-size-xs, 0.75rem);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.downloadButton:hover {
+  background: var(--color-border);
+}
+
+.downloadButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.activityTimeline {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+}
+
+.timelineItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.timelineIndex {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardId {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.actionSummary {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Reduced Motion (UI-15)
    Disables all animations and transitions when user prefers reduced motion.
    Covers: skeleton shimmer, typing dots, button transitions, theme transitions.
