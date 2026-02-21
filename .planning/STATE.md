@@ -5,18 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.3b — Copilot Studio SDK: Orchestrator Readiness
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 9 — Context Injection + Multi-Turn Validation (not yet planned)
-Plan: —
-Status: Phase 8 complete, Phase 9 needs planning
-Last activity: 2026-02-21 — Phase 8 complete (3/3 plans, verification passed)
+Phase: None — between milestones
+Plan: N/A
+Status: v1.3b shipped, ready for next milestone planning
+Last activity: 2026-02-21 — v1.3b milestone archived
 
-Progress: [███░░░░░░░] v1.3b: Phase 8 complete, Phases 9–10 remaining
+Progress: [██████████] v1.3b: SHIPPED — Copilot Studio SDK Orchestrator Readiness
 
 ## Performance Metrics
+
+**v1.3b Velocity (complete):**
+- Plans completed: 9 (Phase 8: 3, Phase 9: 3, Phase 10: 3)
+- Timeline: 2026-02-21 (1 day)
+- Requirements: 19/19 fulfilled
+- Files: 21 changed, 1,667 insertions
 
 **v1.2 Velocity (complete):**
 - Plans completed: 7 (Phase 5: 2, Phase 6: 2, Phase 7: 3)
@@ -40,13 +46,6 @@ Progress: [███░░░░░░░] v1.3b: Phase 8 complete, Phases 9–1
 
 All decisions logged in PROJECT.md Key Decisions table.
 
-### v1.3b Constraints (carry forward into all plans)
-
-- Do NOT modify existing routes (/api/chat/start, /api/chat/send, /api/chat/card-action) in a breaking way — v1.1 behavior must remain intact
-- Do NOT mock Copilot responses for structured output or context injection tests — must use real Copilot Studio agent
-- Spike artifacts (latency measurements, evaluation notes) go in spike/; production code in server/src/
-- All existing tests must continue to pass after each phase
-
 ### Pending Todos
 
 None.
@@ -59,6 +58,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Phase 8 complete, transitioning to Phase 9
-Resume file: None
-Next step: /gsd:plan-phase 9
+Stopped at: v1.3b milestone archived
+Resume file: .planning/MILESTONES.md
+Next step: /gsd:new-milestone

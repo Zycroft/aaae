@@ -2,11 +2,32 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { Activity } from '@microsoft/agents-activity';
 import { ActivityTypes } from '@microsoft/agents-activity';
-import { SendMessageRequestSchema, CardActionRequestSchema } from '@copilot-chat/shared';
+import {
+  SendMessageRequestSchema,
+  CardActionRequestSchema,
+  type WorkflowContext,
+} from '@copilot-chat/shared';
 import { validateCardAction } from '../allowlist/cardActionAllowlist.js';
 import { copilotClient } from '../copilot.js';
 import { conversationStore } from '../store/index.js';
 import { normalizeActivities } from '../normalizer/activityNormalizer.js';
+
+/**
+ * Builds a structured context prefix for Copilot messages.
+ * When workflowContext is provided, this prefix is prepended to the user's message
+ * so the Copilot agent receives workflow state alongside the query.
+ *
+ * CTX-02
+ */
+export function buildContextPrefix(ctx: WorkflowContext): string {
+  return (
+    `[WORKFLOW_CONTEXT]\n` +
+    `step: ${ctx.step}\n` +
+    `constraints: ${ctx.constraints?.join(' | ') ?? 'none'}\n` +
+    `data: ${JSON.stringify(ctx.collectedData ?? {})}\n` +
+    `[/WORKFLOW_CONTEXT]\n\n`
+  );
+}
 
 export const chatRouter = Router();
 
@@ -65,7 +86,7 @@ chatRouter.post('/send', async (req, res) => {
     res.status(400).json({ error: 'Invalid request', details: parsed.error.format() });
     return;
   }
-  const { conversationId, text } = parsed.data;
+  const { conversationId, text, workflowContext } = parsed.data;
 
   // 2. Look up conversation
   const conversation = await conversationStore.get(conversationId);
@@ -75,10 +96,14 @@ chatRouter.post('/send', async (req, res) => {
   }
 
   try {
-    // 3. Build message activity
+    // 3. Build message activity — prepend context prefix if workflowContext provided
+    const outboundText = workflowContext
+      ? buildContextPrefix(workflowContext) + text
+      : text;
+
     const userActivity: Activity = {
       type: ActivityTypes.Message,
-      text,
+      text: outboundText,
     } as Activity;
 
     // 4. Call sendActivityStreaming — no conversationId arg; singleton uses its stored internal ID

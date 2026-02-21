@@ -24,6 +24,16 @@ export {
 } from './schemas/auth.js';
 
 export {
+  WorkflowContextSchema,
+  type WorkflowContext,
+} from './schemas/workflowContext.js';
+
+export {
+  WorkflowStateSchema,
+  type WorkflowState,
+} from './schemas/workflowState.js';
+
+export {
   StartConversationResponseSchema,
   type StartConversationResponse,
   SendMessageRequestSchema,
@@ -34,4 +44,8 @@ export {
   type CardActionRequest,
   CardActionResponseSchema,
   type CardActionResponse,
+  OrchestrateRequestSchema,
+  type OrchestrateRequest,
+  OrchestrateResponseSchema,
+  type OrchestrateResponse,
 } from './schemas/api.js';

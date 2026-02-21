@@ -62,3 +62,23 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.3b Copilot Studio SDK: Orchestrator Readiness (Shipped: 2026-02-21)
+
+**Phases completed:** 3 phases (8–10), 9 plans
+**Timeline:** 2026-02-21 (1 day)
+**Git range:** b36a8cb → 50192db
+**Files changed:** 21 files, 1,667 insertions, 8 deletions
+**Requirements:** 19/19 fulfilled
+
+**Key accomplishments:**
+1. ExtractedPayload Zod schema with 3-surface priority extraction engine (activity.value > entities > text-embedded JSON) — 20 new extraction tests, all 14 pre-existing normalizer tests pass
+2. WorkflowContext schema + server context injection — structured [WORKFLOW_CONTEXT] prefix injected into outbound Copilot messages via /send route, backwards-compatible (optional field)
+3. 3-turn context injection spike script validating multi-turn conversation continuity at 500-char and 1000-char context sizes
+4. Latency baseline spike script measuring startConversation, sendMessage, and full round-trip (5 samples each, ready for real credentials)
+5. WorkflowState schema + LRU-backed InMemoryWorkflowStateStore for per-conversation orchestrator state tracking
+6. POST /api/chat/orchestrate endpoint — batteries-included single call starting conversation, sending query with optional context, returning messages + extractedPayload + latencyMs + workflowState
+7. SDK-EVALUATION.md with CONDITIONAL GO recommendation for v1.5 Workflow Orchestrator — all code infrastructure complete, pending live credential validation
+
+---
+

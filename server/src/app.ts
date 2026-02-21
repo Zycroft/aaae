@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgAllowlist } from './middleware/orgAllowlist.js';
 import { chatRouter } from './routes/chat.js';
+import { orchestrateRouter } from './routes/orchestrate.js';
 
 export function createApp() {
   const app = express();
@@ -33,6 +34,9 @@ export function createApp() {
 
   // Chat routes (SERV-02, SERV-03, SERV-04)
   app.use('/api/chat', chatRouter);
+
+  // Orchestrate route — batteries-included endpoint for workflow orchestrator (ORCH-03)
+  app.use('/api/chat/orchestrate', orchestrateRouter);
 
   return app;
 }
