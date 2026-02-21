@@ -62,13 +62,22 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-_(none — v1.1 milestone complete)_
+<!-- Current scope: v1.2 Entra External ID Authentication (MSAL) -->
+
+- [ ] Client authenticates users via MSAL React against Entra External ID (CIAM)
+- [ ] Server validates JWT access tokens (signature, audience, issuer, expiry)
+- [ ] Org Allowlist blocks requests from disallowed tenants (403)
+- [ ] Shared auth types (UserClaims schema) in shared/
+- [ ] AUTH_REQUIRED=false bypass preserved for local dev
+- [ ] Sign-out clears MSAL cache and returns to sign-in page
+- [ ] Token refresh happens silently (no mid-conversation logouts)
+- [ ] Environment variables documented in .env.example files
+- [ ] Unit tests for JWT validation and Org Allowlist middleware
 
 ### Out of Scope
 
-- Real MSAL/OBO token implementation — placeholder stubs only for v1; full implementation is AUTH-01 for v2
+- MSAL Node OBO flow (calling downstream APIs as user) — v1.2 server only validates incoming tokens; Copilot Studio uses its own credentials
 - Deployment infrastructure (Azure Functions, APIM) — documented but not wired
-- OAuth/SSO for end users — CIAM bearer token assumed to be provided externally
 - Direct browser → Copilot Studio calls — violates security requirement
 - Mobile native app — web-first, mobile is a future milestone
 - Real-time multi-user conversations — single-user sessions for v1
@@ -76,6 +85,17 @@ _(none — v1.1 milestone complete)_
 - Server-Sent Events (SSE) streaming — v2 (PERF-01)
 - Markdown rendering in text messages — v2 (CARD-01)
 - Quick-reply chips from suggestedActions — v2 (CARD-02)
+
+## Current Milestone: v1.2 Entra External ID Authentication (MSAL)
+
+**Goal:** Add real user authentication via Entra External ID (CIAM) using MSAL React on the client and JWT validation on the server, replacing the v1 auth stubs.
+
+**Target features:**
+- MSAL React sign-in/sign-out with Entra External ID (CIAM)
+- Server JWT validation (signature, audience, issuer, expiry) via JWKS
+- Org Allowlist middleware (tenant ID check against env var allowlist)
+- Shared UserClaims Zod schema
+- AUTH_REQUIRED=false local dev bypass preserved
 
 ## Context
 
@@ -122,5 +142,7 @@ _(none — v1.1 milestone complete)_
 | npm ls zod --depth=Infinity | Enforces single Zod instance across full workspace tree, not just direct deps | ✓ Good — would catch hoisted duplicates that --depth=0 would miss |
 | MetadataPane as prop-receiving component | No new hook needed; ChatShell already owns message state | ✓ Good — clean composition, simple to test |
 
+| Entra External ID (CIAM) over standard Entra ID | CIAM uses `ciamlogin.com` authority URLs; designed for customer-facing apps | — Pending |
+
 ---
-*Last updated: 2026-02-20 after v1.1 milestone*
+*Last updated: 2026-02-20 after v1.2 milestone start*
