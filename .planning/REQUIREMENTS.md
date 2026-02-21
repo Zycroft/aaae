@@ -35,16 +35,16 @@ Requirements for v1.2 Entra External ID Authentication (MSAL). Each maps to road
 
 ### Shared Schema
 
-- [ ] **SCHEMA-01**: `UserClaims` Zod schema exists in `shared/src/schemas/auth.ts` with fields: sub, tid, email?, name?, oid
-- [ ] **SCHEMA-02**: TypeScript type exported for server-side `req.user`
+- [x] **SCHEMA-01**: `UserClaims` Zod schema exists in `shared/src/schemas/auth.ts` with fields: sub, tid, email?, name?, oid
+- [x] **SCHEMA-02**: TypeScript type exported for server-side `req.user`
 
 ### Configuration
 
-- [ ] **CFG-01**: Server env vars added: `AZURE_TENANT_NAME`, `AZURE_CLIENT_ID`, `ALLOWED_TENANT_IDS`
-- [ ] **CFG-02**: Client env vars added: `VITE_AZURE_CLIENT_ID`, `VITE_AZURE_TENANT_NAME`, `VITE_AZURE_REDIRECT_URI`
-- [ ] **CFG-03**: `.env.example` files updated for both workspaces
-- [ ] **CFG-04**: Server fails closed (refuses all requests) if `AZURE_CLIENT_ID` is not set when `AUTH_REQUIRED=true`
-- [ ] **CFG-05**: `AUTH_REQUIRED=false` still works for local dev without Azure AD setup
+- [x] **CFG-01**: Server env vars added: `AZURE_TENANT_NAME`, `AZURE_CLIENT_ID`, `ALLOWED_TENANT_IDS`
+- [x] **CFG-02**: Client env vars added: `VITE_AZURE_CLIENT_ID`, `VITE_AZURE_TENANT_NAME`, `VITE_AZURE_REDIRECT_URI`
+- [x] **CFG-03**: `.env.example` files updated for both workspaces
+- [x] **CFG-04**: Server fails closed (refuses all requests) if `AZURE_CLIENT_ID` is not set when `AUTH_REQUIRED=true`
+- [x] **CFG-05**: `AUTH_REQUIRED=false` still works for local dev without Azure AD setup
 
 ### Testing
 
@@ -80,13 +80,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-01 | Phase 5 | Pending |
-| SCHEMA-02 | Phase 5 | Pending |
-| CFG-01 | Phase 5 | Pending |
-| CFG-02 | Phase 5 | Pending |
-| CFG-03 | Phase 5 | Pending |
-| CFG-04 | Phase 5 | Pending |
-| CFG-05 | Phase 5 | Pending |
+| SCHEMA-01 | Phase 5 | Complete |
+| SCHEMA-02 | Phase 5 | Complete |
+| CFG-01 | Phase 5 | Complete |
+| CFG-02 | Phase 5 | Complete |
+| CFG-03 | Phase 5 | Complete |
+| CFG-04 | Phase 5 | Complete |
+| CFG-05 | Phase 5 | Complete |
 | SAUTH-01 | Phase 6 | Pending |
 | SAUTH-02 | Phase 6 | Pending |
 | SAUTH-03 | Phase 6 | Pending |

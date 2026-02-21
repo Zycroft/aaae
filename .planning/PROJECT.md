@@ -59,6 +59,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ README: monorepo quick start, full env var table (10 vars), project structure, security notes — v1.1
 - ✓ docs/adaptive-card-playbook.md: 4-step card registration guide, allowlist wiring, test pattern — v1.1
 - ✓ docs/cards/feedback-survey.json: sample Adaptive Card v1.5 with ChoiceSet and Action.Submit — v1.1
+- ✓ Shared auth types (UserClaims schema) in shared/ — v1.2 Phase 5
+- ✓ AUTH_REQUIRED=false bypass preserved for local dev — v1.2 Phase 5
+- ✓ Environment variables documented in .env.example files — v1.2 Phase 5
 
 ### Active
 
@@ -67,11 +70,8 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - [ ] Client authenticates users via MSAL React against Entra External ID (CIAM)
 - [ ] Server validates JWT access tokens (signature, audience, issuer, expiry)
 - [ ] Org Allowlist blocks requests from disallowed tenants (403)
-- [ ] Shared auth types (UserClaims schema) in shared/
-- [ ] AUTH_REQUIRED=false bypass preserved for local dev
 - [ ] Sign-out clears MSAL cache and returns to sign-in page
 - [ ] Token refresh happens silently (no mid-conversation logouts)
-- [ ] Environment variables documented in .env.example files
 - [ ] Unit tests for JWT validation and Org Allowlist middleware
 
 ### Out of Scope
@@ -143,6 +143,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | MetadataPane as prop-receiving component | No new hook needed; ChatShell already owns message state | ✓ Good — clean composition, simple to test |
 
 | Entra External ID (CIAM) over standard Entra ID | CIAM uses `ciamlogin.com` authority URLs; designed for customer-facing apps | — Pending |
+| oid required in UserClaims (not optional) | Stable Azure AD object ID always present in Entra External ID tokens | ✓ Good — needed for user identity in JWT middleware |
+| Fail-closed AZURE_CLIENT_ID guard at startup | process.exit(1) when AUTH_REQUIRED=true but AZURE_CLIENT_ID missing | ✓ Good — no silent passthrough possible |
+| ALLOWED_TENANT_IDS parsed to string[] at config load | Avoids repeated split in middleware; filter(Boolean) removes empty strings | ✓ Good — clean for Phase 6 consumption |
 
 ---
-*Last updated: 2026-02-20 after v1.2 milestone start*
+*Last updated: 2026-02-21 after Phase 5*

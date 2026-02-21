@@ -12,6 +12,11 @@ export {
 } from './schemas/message.js';
 
 export {
+  UserClaimsSchema,
+  type UserClaims,
+} from './schemas/auth.js';
+
+export {
   StartConversationResponseSchema,
   type StartConversationResponse,
   SendMessageRequestSchema,

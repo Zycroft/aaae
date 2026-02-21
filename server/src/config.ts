@@ -11,6 +11,15 @@ for (const key of REQUIRED) {
   }
 }
 
+// Azure AD config — required when AUTH_REQUIRED=true (fail-closed: never silently skip validation)
+if (process.env.AUTH_REQUIRED !== 'false') {
+  if (!process.env.AZURE_CLIENT_ID) {
+    console.error('[config] FATAL: AUTH_REQUIRED=true but AZURE_CLIENT_ID is not set.');
+    console.error('[config] Set AZURE_CLIENT_ID in server/.env or set AUTH_REQUIRED=false for local dev without Azure AD.');
+    process.exit(1);
+  }
+}
+
 export const config = {
   COPILOT_ENVIRONMENT_ID: process.env.COPILOT_ENVIRONMENT_ID!,
   COPILOT_AGENT_SCHEMA_NAME: process.env.COPILOT_AGENT_SCHEMA_NAME!,
@@ -22,4 +31,9 @@ export const config = {
   AUTH_REQUIRED: process.env.AUTH_REQUIRED !== 'false',
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
   PORT: Number(process.env.PORT ?? 3001),
+  AZURE_TENANT_NAME: process.env.AZURE_TENANT_NAME,
+  AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
+  ALLOWED_TENANT_IDS: process.env.ALLOWED_TENANT_IDS
+    ? process.env.ALLOWED_TENANT_IDS.split(',').map((id) => id.trim()).filter(Boolean)
+    : [],
 } as const;
