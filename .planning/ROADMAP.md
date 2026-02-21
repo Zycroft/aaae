@@ -20,13 +20,20 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 
 ### 📋 v1.1 Polish (Planned)
 
-- [ ] **Phase 4: Polish, Metadata Drawer, CI, and Docs** — Timeline sidebar, activity log download, GitHub Actions CI with security checks, README, and Adaptive Cards playbook
+### Phase 4: Polish, Metadata Drawer, CI, and Docs
 
-**Phase 4 Goal:** The timeline sidebar and activity log download are functional; GitHub Actions runs lint and tests with credential-leak and Zod-instance checks; README and Adaptive Cards playbook give a new developer everything needed to run and extend the app
+**Goal:** The timeline sidebar and activity log download are functional; GitHub Actions runs lint and tests with credential-leak and Zod-instance checks; README and Adaptive Cards playbook give a new developer everything needed to run and extend the app
 
-**Phase 4 Requirements:** UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03
+**Requirements:** UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03
 
-**Phase 4 Success Criteria:**
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — MetadataPane component: timeline sidebar (UI-11) and activity log download button (UI-12)
+- [ ] 04-02-PLAN.md — GitHub Actions CI workflow: lint, test, credential-leak check, Zod-instance check (INFRA-07)
+- [ ] 04-03-PLAN.md — README.md, adaptive-card-playbook.md, and sample card JSON (DOCS-01, DOCS-02, DOCS-03)
+
+**Success Criteria:**
 1. On desktop, the metadata drawer sidebar lists all completed card actions in chronological order; clicking the activity log download button produces a valid JSON file containing the full conversation history
 2. Pushing to the repo triggers a GitHub Actions workflow that lints and tests both workspaces; the workflow fails if `grep -r "COPILOT" client/` returns any matches or `npm ls zod` shows more than one Zod instance
 3. A developer with no prior project knowledge can follow README.md to configure `.env` files, run `npm run dev`, and have a working local instance
@@ -39,4 +46,4 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 | 1. Scaffold + Schema + Server Foundation | v1.0 | 4/4 | Complete | 2026-02-20 |
 | 2. Text Chat End-to-End | v1.0 | 4/4 | Complete | 2026-02-20 |
 | 3. Adaptive Cards + Accessibility + Theming | v1.0 | 5/5 | Complete | 2026-02-20 |
-| 4. Polish, Metadata Drawer, CI, and Docs | v1.1 | 0/TBD | Not started | - |
+| 4. Polish, Metadata Drawer, CI, and Docs | v1.1 | 0/3 | Not started | - |
