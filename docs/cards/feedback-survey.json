@@ -1,0 +1,44 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "How satisfied are you with this interaction?",
+      "weight": "Bolder",
+      "wrap": true
+    },
+    {
+      "type": "Input.ChoiceSet",
+      "id": "satisfaction",
+      "style": "expanded",
+      "isRequired": true,
+      "errorMessage": "Please select a satisfaction level",
+      "choices": [
+        { "title": "Very Satisfied", "value": "5" },
+        { "title": "Satisfied", "value": "4" },
+        { "title": "Neutral", "value": "3" },
+        { "title": "Dissatisfied", "value": "2" },
+        { "title": "Very Dissatisfied", "value": "1" }
+      ]
+    },
+    {
+      "type": "Input.Text",
+      "id": "comments",
+      "placeholder": "Optional comments...",
+      "isMultiline": true,
+      "maxLength": 500
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "title": "Submit Feedback",
+      "data": {
+        "action": "Action.Submit",
+        "cardId": "feedback-survey"
+      }
+    }
+  ]
+}

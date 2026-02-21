@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  security-checks:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check credential leaks
+        run: |
+          if grep -r "COPILOT_[A-Z_]*=" client/ 2>/dev/null | grep -v "node_modules" | grep -v ".git" | grep -q .; then
+            echo "FAIL: Copilot credentials found in client code"
+            grep -r "COPILOT_[A-Z_]*=" client/ | grep -v "node_modules" | grep -v ".git"
+            exit 1
+          fi
+          echo "PASS: No credential leaks detected"
+
+      - name: Check Zod instance count
+        run: |
+          ZOD_COUNT=$(npm ls zod --depth=Infinity 2>/dev/null | grep -c "zod@" || echo "0")
+          if [ "$ZOD_COUNT" -ne 1 ]; then
+            echo "FAIL: Expected 1 Zod instance, found $ZOD_COUNT"
+            npm ls zod
+            exit 1
+          fi
+          echo "PASS: Single Zod instance verified (count=$ZOD_COUNT)"

@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1–3 (shipped 2026-02-20)
-- 📋 **v1.1 Polish** — Phase 4 (planned)
+- ✅ **v1.1 Polish** — Phase 4 (shipped 2026-02-20)
 
 ## Phases
 
@@ -18,7 +18,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 
 </details>
 
-### 📋 v1.1 Polish (Planned)
+### ✅ v1.1 Polish (Shipped 2026-02-20)
 
 ### Phase 4: Polish, Metadata Drawer, CI, and Docs
 
@@ -29,9 +29,9 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — MetadataPane component: timeline sidebar (UI-11) and activity log download button (UI-12)
-- [ ] 04-02-PLAN.md — GitHub Actions CI workflow: lint, test, credential-leak check, Zod-instance check (INFRA-07)
-- [ ] 04-03-PLAN.md — README.md, adaptive-card-playbook.md, and sample card JSON (DOCS-01, DOCS-02, DOCS-03)
+- [x] 04-01-PLAN.md — MetadataPane component: timeline sidebar (UI-11) and activity log download button (UI-12)
+- [x] 04-02-PLAN.md — GitHub Actions CI workflow: lint, test, credential-leak check, Zod-instance check (INFRA-07)
+- [x] 04-03-PLAN.md — README.md, adaptive-card-playbook.md, and sample card JSON (DOCS-01, DOCS-02, DOCS-03)
 
 **Success Criteria:**
 1. On desktop, the metadata drawer sidebar lists all completed card actions in chronological order; clicking the activity log download button produces a valid JSON file containing the full conversation history
@@ -46,4 +46,4 @@ Plans:
 | 1. Scaffold + Schema + Server Foundation | v1.0 | 4/4 | Complete | 2026-02-20 |
 | 2. Text Chat End-to-End | v1.0 | 4/4 | Complete | 2026-02-20 |
 | 3. Adaptive Cards + Accessibility + Theming | v1.0 | 5/5 | Complete | 2026-02-20 |
-| 4. Polish, Metadata Drawer, CI, and Docs | v1.1 | 0/3 | Not started | - |
+| 4. Polish, Metadata Drawer, CI, and Docs | v1.1 | 3/3 | Complete | 2026-02-20 |
