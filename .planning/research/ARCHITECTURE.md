@@ -1,485 +1,702 @@
-# Architecture Research
+# Architecture: Redis Persistent State Store Integration
 
-**Domain:** React + Node proxy chat app for Microsoft Copilot Studio with Adaptive Cards
-**Researched:** 2026-02-19
-**Confidence:** HIGH (CopilotStudioClient API verified against official Microsoft Learn docs; patterns verified against official SDK samples and established Node/Express patterns)
-
----
-
-## Standard Architecture
-
-### System Overview
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Browser (Client)                           │
-│                                                                   │
-│  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │ ChatTranscript│  │  CardRenderer    │  │  MetadataDrawer  │   │
-│  │ (scroll view) │  │ (adaptive cards) │  │  (timeline/log)  │   │
-│  └──────┬───────┘  └────────┬─────────┘  └────────┬─────────┘   │
-│         │                   │                      │              │
-│  ┌──────┴───────────────────┴──────────────────────┴──────────┐  │
-│  │               Chat State (React context / Zustand)          │  │
-│  └─────────────────────────────┬───────────────────────────────┘  │
-│                                │ fetch (Bearer token header)       │
-└────────────────────────────────┼──────────────────────────────────┘
-                                 │ HTTPS /api/chat/*
-┌────────────────────────────────┼──────────────────────────────────┐
-│                     Node / Express Server                          │
-│                                │                                   │
-│  ┌─────────────────────────────┼───────────────────────────────┐  │
-│  │              Auth Middleware (CIAM Bearer Validation)        │  │
-│  └─────────────────────────────┬───────────────────────────────┘  │
-│                                │                                   │
-│  ┌──────────────┐  ┌───────────┴──────────┐  ┌────────────────┐  │
-│  │ POST /start  │  │  POST /send          │  │ POST /card-     │  │
-│  │ (new convo)  │  │  (text message)      │  │ action          │  │
-│  └──────┬───────┘  └──────────┬───────────┘  └───────┬────────┘  │
-│         │                     │                       │            │
-│  ┌──────┴─────────────────────┴───────────────────────┴────────┐  │
-│  │            Response Normalizer (Activity → NormalizedMsg)    │  │
-│  └─────────────────────────────────────────────────────────────┘  │
-│                                │                                   │
-│  ┌─────────────────────────────┼───────────────────────────────┐  │
-│  │     CopilotStudioClient (server-side only, holds JWT)       │  │
-│  │     @microsoft/agents-copilotstudio-client                  │  │
-│  └─────────────────────────────┬───────────────────────────────┘  │
-└────────────────────────────────┼──────────────────────────────────┘
-                                 │ HTTPS (Power Platform API)
-                    ┌────────────┴────────────┐
-                    │   Microsoft Copilot      │
-                    │   Studio (cloud service) │
-                    └─────────────────────────┘
-```
-
-### Component Responsibilities
-
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| ChatTranscript | Render ordered list of messages; auto-scroll; optimistic bubbles; loading skeletons | React component with useEffect scroll, message array from state store |
-| CardRenderer | Render Adaptive Card JSON payloads; fire submit events; disable card after submission | `adaptivecards` SDK + `adaptivecards-react` wrapper; `onExecuteAction` callback |
-| MetadataDrawer | Desktop sidebar: timeline of card actions, activity log download | React panel; reads completed-actions slice of state |
-| Chat State | Client-side truth of conversation: messages, conversationId, loading flags, error state | React context or Zustand store |
-| Auth Middleware | Validate incoming CIAM Bearer token on every `/api/chat/*` request | Express middleware; `express-oauth2-jwt-bearer` or manual JWT verify |
-| `/api/chat/start` | Create a new Copilot Studio conversation; return `conversationId` | Route handler; calls `client.startConversationStreaming(true)` |
-| `/api/chat/send` | Accept user text + conversationId; forward to Copilot; return normalized messages | Route handler; calls `client.sendActivityStreaming(activity, conversationId)` |
-| `/api/chat/card-action` | Accept card submission payload; validate against action allowlist; forward to Copilot | Route handler; Zod validation + allowlist check before forwarding |
-| Response Normalizer | Convert raw Bot Framework `Activity[]` from Copilot into `NormalizedMessage[]` | Pure function; shared Zod schema as target type |
-| CopilotStudioClient | Server-side singleton (or per-user instance) holding JWT and connection settings; wraps the M365 Agents SDK | `new CopilotStudioClient(settings, token)` — never instantiated in browser |
-| Shared Zod Schemas (`shared/`) | Single source of truth for `NormalizedMessage`, API request/response shapes; generates TypeScript types | `z.object(...)` in `shared/src/schemas.ts`; imported by both `client/` and `server/` |
+**Domain:** Agentic Copilot Chat App (Express + React monorepo)
+**Researched:** 2026-02-21
+**Mode:** Ecosystem + Architecture Integration
+**Confidence:** HIGH
 
 ---
 
-## Recommended Project Structure
+## Executive Summary
 
-```
-aaae/                             # monorepo root
-├── package.json                  # npm workspaces: ["client","server","shared"]
-├── tsconfig.base.json            # shared TS config extended by all packages
-│
-├── shared/                       # shared schemas + types (no browser/Node deps)
-│   ├── package.json              # name: "@aaae/shared"; no external deps except zod
-│   └── src/
-│       ├── schemas.ts            # NormalizedMessage, StartResponse, SendRequest, CardActionRequest
-│       └── index.ts              # barrel export
-│
-├── server/                       # Express proxy
-│   ├── package.json              # depends on @aaae/shared, @microsoft/agents-copilotstudio-client
-│   ├── src/
-│   │   ├── index.ts              # Express app entry; registers middleware + routes
-│   │   ├── middleware/
-│   │   │   └── auth.ts           # CIAM bearer token validation middleware
-│   │   ├── routes/
-│   │   │   ├── start.ts          # POST /api/chat/start
-│   │   │   ├── send.ts           # POST /api/chat/send
-│   │   │   └── cardAction.ts     # POST /api/chat/card-action
-│   │   ├── services/
-│   │   │   └── copilotClient.ts  # CopilotStudioClient factory / singleton
-│   │   └── normalizer/
-│   │       └── activityNormalizer.ts  # Activity[] → NormalizedMessage[]
-│   └── .env.example
-│
-└── client/                       # Vite + React 18
-    ├── package.json              # depends on @aaae/shared, adaptivecards, adaptivecards-react
-    ├── vite.config.ts            # proxy: { "/api": "http://localhost:3001" }
-    └── src/
-        ├── main.tsx
-        ├── store/
-        │   └── chatStore.ts      # Zustand store: messages[], conversationId, loading, error
-        ├── api/
-        │   └── chatApi.ts        # fetch wrappers for /api/chat/* with Bearer header injection
-        ├── components/
-        │   ├── ChatTranscript.tsx     # scrollable message list
-        │   ├── MessageBubble.tsx      # text message rendering
-        │   ├── CardRenderer.tsx       # Adaptive Card host with onExecuteAction
-        │   ├── MetadataDrawer.tsx     # desktop sidebar / timeline
-        │   ├── InputBar.tsx           # text input + send button
-        │   └── ThemeToggle.tsx        # dark/light
-        └── types/                # re-exports from @aaae/shared for convenience
-```
+This research maps the Redis persistent state store integration into the existing Express server architecture. The goal is to replace the in-memory LRU conversation store with a Redis-backed implementation while maintaining backward compatibility and enabling multi-instance scaling for the v1.5 Workflow Orchestrator.
 
-### Structure Rationale
+**Key Finding:** Redis integration follows a **factory pattern** for store selection (Redis vs InMemory), which cleanly isolates Redis complexity behind the existing `ConversationStore` interface. This requires:
 
-- **shared/:** Zero runtime dependencies except Zod. Both `client/` and `server/` import from `@aaae/shared`. Changing a schema immediately surfaces TypeScript errors in both packages. This is the standard monorepo shared-contract pattern.
-- **server/middleware/:** Auth extracted from routes so every `/api/chat/*` route is protected identically without repetition. Swap or extend authentication (e.g., real MSAL OBO) without touching route logic.
-- **server/normalizer/:** Isolated from routes so it is unit-testable without HTTP context. The normalizer is the riskiest translation layer — card payloads, typing indicators, end-of-conversation signals all need handling.
-- **server/services/copilotClient.ts:** The `CopilotStudioClient` requires a JWT that may be per-user (OBO flow) or service-principal. Keeping construction in a factory isolates the token acquisition concern.
-- **client/store/:** Centralizes optimistic updates, error state, and message ordering. Components read from store; never call API directly — all API calls go through `chatApi.ts`.
+1. **Minimal chat route changes** — routes use the abstract interface, never know about Redis
+2. **Expanded StoredConversation schema** — adds userId, tenantId, timestamps, status (in shared/)
+3. **Secondary index via sorted sets** — for user-scoped queries (sorted set on userId+timestamp)
+4. **Health check enhancement** — reports Redis connectivity status
+5. **Graceful failure handling** — returns 503 when Redis unavailable (no silent fallback)
+
+The architecture preserves all existing Express middleware patterns (auth, orgAllowlist) and maintains the singleton pattern for the store instance, making this a **drop-in replacement** at the integration layer.
 
 ---
 
-## Architectural Patterns
+## Component Architecture
 
-### Pattern 1: Server-Side SDK Proxy (Primary Pattern)
+```
+┌─ Express Server (app.ts) ─────────────────────────────────────────────────┐
+│                                                                             │
+│  CORS → JSON Parser → Health Check (unauthenticated)                       │
+│       ↓                                                                     │
+│  [Auth Middleware] → [Org Allowlist Middleware]                            │
+│       ↓                                                                     │
+│  ┌─ Chat Routes (chat.ts) ──────────────────────────────────────────┐     │
+│  │                                                                   │     │
+│  │  /start    → [Copilot] → StoredConversation → Store.set()        │     │
+│  │  /send     → [Lookup] → [Copilot] → [Normalize] → Store.set()    │     │
+│  │  /card-action → [Validate] → [Copilot] → [Normalize] → Store.set()   │     │
+│  │                                  ↓                                │     │
+│  │                         Store Interface                           │     │
+│  │                              ↓                                    │     │
+│  │         ┌─────────────────────┴────────────────────┐             │     │
+│  │         ↓                                          ↓             │     │
+│  │   RedisStore (new)                       InMemoryStore (legacy)  │     │
+│  │   ├─ ioredis client                       ├─ LRUCache            │     │
+│  │   ├─ JSON serialization                   └─ Synchronous         │     │
+│  │   ├─ Sorted set indexes                                          │     │
+│  │   ├─ TTL management                       Factory Pattern:        │     │
+│  │   └─ Async/await throughout              createStore() → pick    │     │
+│  │                                           one based on env vars   │     │
+│  └─ [Health Check] → Redis.ping() + client.status ────────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-**What:** The `CopilotStudioClient` from `@microsoft/agents-copilotstudio-client` runs exclusively on the Node server. The browser never sees Copilot Studio credentials, environment IDs, or the SDK. The server exposes a thin REST API that the React client calls.
+Data Flow Detail:
+  1. Request enters auth middleware (req.user populated)
+  2. Route handler calls Store.get(conversationId)
+  3. Store returns StoredConversation (userId, tenantId, history, etc.)
+  4. Route logic proceeds (lookup complete, always in O(1))
+  5. After Copilot response: Store.set() with updated conversation
+  6. Redis path: async client.json.set() + ZADD (sorted set index)
+  7. Health check probes redis.ping() on-demand
+```
 
-**When to use:** Always — this is a hard requirement for this project (secrets never in browser).
+---
 
-**Trade-offs:** Adds a network hop vs. client-direct; server must manage `conversationId` lifecycle and client association. Gain: secrets protected, single audit point.
+## New Components
 
-**Example (server/src/routes/send.ts):**
+### 1. **RedisStore Implementation** (`server/src/store/RedisStore.ts`)
+
+**Responsibility:** Implement ConversationStore interface on top of ioredis, managing conversation state with secondary indexes.
+
+**Key Details:**
+
+- **Constructor:** Accepts ioredis client instance (injected, not created internally)
+- **Data serialization:** `JSON.stringify(StoredConversation)` on write, `JSON.parse()` on read
+- **Keys:** `conversation:{externalId}` (primary), `user:{userId}:{timestamp}:{externalId}` (sorted set index)
+- **Sorted set score:** Timestamp (milliseconds), allows range queries like "all conversations for user in last 7 days"
+- **TTL:** Applied to primary key only (e.g., 30 days expiration), sorted set entries clean up when primary expires
+- **Error handling:** Throws with descriptive messages; app.ts health check catches and returns 503
+
 ```typescript
-import { CopilotStudioClient } from '@microsoft/agents-copilotstudio-client';
-import { NormalizedMessageSchema } from '@aaae/shared';
+// Pseudocode structure
+export class RedisStore implements ConversationStore {
+  constructor(private client: Redis) {}
 
-router.post('/send', authMiddleware, async (req, res) => {
-  const { conversationId, text } = req.body; // validated by Zod before this
-  const client = getCopilotClient();          // singleton or per-user factory
-  const activity = { type: 'message', text };
-
-  const messages: NormalizedMessage[] = [];
-  for await (const act of client.sendActivityStreaming(activity, conversationId)) {
-    const msg = normalizeActivity(act);
-    if (msg) messages.push(msg);
+  async get(id: string): Promise<StoredConversation | undefined> {
+    const json = await this.client.get(`conversation:${id}`);
+    if (!json) return undefined;
+    return JSON.parse(json);
   }
-  res.json({ messages });
-});
-```
 
-### Pattern 2: Zod Shared Contract
-
-**What:** All data crossing the client/server boundary is defined once in `shared/src/schemas.ts` as Zod schemas. `z.infer<typeof Schema>` generates TypeScript types. Both sides validate with `Schema.parse(...)` at their respective boundaries.
-
-**When to use:** Always for API request/response shapes and the normalized message type.
-
-**Trade-offs:** Slightly more setup than manual types; significant safety gain because runtime validation matches static types.
-
-**Example (shared/src/schemas.ts):**
-```typescript
-import { z } from 'zod';
-
-export const NormalizedMessageSchema = z.object({
-  id: z.string(),
-  role: z.enum(['user', 'agent']),
-  type: z.enum(['text', 'adaptiveCard', 'typing', 'error']),
-  text: z.string().optional(),
-  cardPayload: z.record(z.unknown()).optional(), // raw Adaptive Card JSON
-  timestamp: z.string().datetime(),
-});
-export type NormalizedMessage = z.infer<typeof NormalizedMessageSchema>;
-
-export const CardActionRequestSchema = z.object({
-  conversationId: z.string(),
-  actionType: z.string(),    // validated against allowlist on server
-  data: z.record(z.unknown()),
-});
-export type CardActionRequest = z.infer<typeof CardActionRequestSchema>;
-```
-
-### Pattern 3: Adaptive Card Action Allowlist
-
-**What:** The server maintains an explicit set of permitted `actionType` strings. When `/api/chat/card-action` receives a submission, it validates `actionType` against the allowlist before forwarding anything to Copilot Studio. `Action.OpenUrl` targets are similarly allowlisted by domain.
-
-**When to use:** Always — prevents arbitrary actions from malicious or malformed card payloads reaching Copilot.
-
-**Trade-offs:** Allowlist needs maintenance as new card types are added. Use a Playbook doc (Adaptive Cards playbook) to document the registration pattern.
-
-**Example (server/src/routes/cardAction.ts):**
-```typescript
-const ACTION_ALLOWLIST = new Set(['submitForm', 'confirmOrder', 'cancelRequest']);
-const URL_DOMAIN_ALLOWLIST = ['contoso.com', 'learn.microsoft.com'];
-
-router.post('/card-action', authMiddleware, async (req, res) => {
-  const body = CardActionRequestSchema.parse(req.body);
-  if (!ACTION_ALLOWLIST.has(body.actionType)) {
-    return res.status(403).json({ error: 'Action not permitted' });
+  async set(id: string, conv: StoredConversation): Promise<void> {
+    const json = JSON.stringify(conv);
+    await this.client.set(
+      `conversation:${id}`,
+      json,
+      'EX', // EX = expiry in seconds
+      30 * 24 * 60 * 60, // 30 days
+    );
+    // Secondary index: sorted set on userId
+    if (conv.userId) {
+      const score = conv.createdAt ?? Date.now(); // Timestamp as score
+      const member = `${conv.externalId}`;
+      await this.client.zadd(
+        `user:${conv.userId}:conversations`,
+        score,
+        member,
+      );
+    }
   }
-  // forward to Copilot via sendActivityStreaming...
-});
-```
 
-### Pattern 4: Streaming Activity Consumption
+  async listByUser(userId: string): Promise<StoredConversation[]> {
+    // ZRANGE with BYSCORE for range queries (e.g., last 7 days)
+    const members = await this.client.zrange(
+      `user:${userId}:conversations`,
+      0, -1,
+    );
+    const conversations = await Promise.all(
+      members.map((id) => this.get(id as string)),
+    );
+    return conversations.filter((c) => c !== undefined);
+  }
 
-**What:** `CopilotStudioClient.startConversationStreaming()` and `sendActivityStreaming()` return `AsyncGenerator<Activity>`. The server collects all yielded activities synchronously (for a simple HTTP response) or can SSE-stream them to the client for low-latency display.
-
-**When to use:** Collect-then-respond is simpler for v1. SSE streaming is a future enhancement.
-
-**Trade-offs:** Collect-then-respond has higher perceived latency; SSE streaming adds complexity (client EventSource, partial JSON, connection management).
-
-```typescript
-// v1: collect all activities, then respond
-const messages: NormalizedMessage[] = [];
-for await (const act of client.startConversationStreaming(true)) {
-  const msg = normalizeActivity(act);
-  if (msg) messages.push(msg);
+  async delete(id: string): Promise<void> {
+    const conv = await this.get(id);
+    if (conv?.userId) {
+      await this.client.zrem(`user:${conv.userId}:conversations`, id);
+    }
+    await this.client.del(`conversation:${id}`);
+  }
 }
-res.json({ conversationId: client.conversationId, messages });
+```
+
+**Why this design:**
+- Sorted sets enable O(log N) user-scoped lookups (Phase 1.5 feature)
+- JSON string storage avoids Redis JSON module dependency (keep stack simple)
+- TTL on primary key only (Redis TTL deletes key, sorted set entry becomes orphaned)
+- Async/await throughout (matches Express async route patterns)
+
+---
+
+### 2. **Store Factory** (`server/src/store/createStore.ts`)
+
+**Responsibility:** Single-point decision for which store implementation to use, based on environment variables.
+
+**Logic:**
+
+```typescript
+// server/src/store/createStore.ts
+import { config } from '../config.js';
+import { Redis } from 'ioredis';
+import { InMemoryConversationStore } from './InMemoryStore.js';
+import { RedisStore } from './RedisStore.js';
+
+export function createStore(): ConversationStore {
+  if (config.REDIS_URL) {
+    const redisClient = new Redis(config.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      // For Azure Cache for Redis (Premium tier with TLS required)
+      tls: true, // Auto-enabled if REDIS_URL starts with rediss://
+    });
+
+    redisClient.on('error', (err) => {
+      console.error('[store] Redis client error:', err);
+    });
+
+    return new RedisStore(redisClient);
+  }
+
+  console.log('[store] REDIS_URL not set, using InMemoryStore');
+  return new InMemoryConversationStore();
+}
+```
+
+**Deployment patterns:**
+
+```
+Development:     REDIS_URL not set → InMemoryStore (no dependencies)
+Local Redis:     REDIS_URL=redis://localhost:6379 → RedisStore
+Azure Redis:     REDIS_URL=rediss://myapp.redis.cache.windows.net:6380 → RedisStore (auto TLS)
+```
+
+**Integration into store/index.ts:**
+
+```typescript
+import { createStore } from './createStore.js';
+
+export const conversationStore: ConversationStore = createStore();
 ```
 
 ---
 
-## Data Flow
+### 3. **Expanded StoredConversation Schema** (shared/src/schemas/)
 
-### Request Flow: Text Message
+**Add to schema definition:**
 
-```
-User types text, presses Send
-    │
-    ↓
-chatApi.ts: POST /api/chat/send
-  { conversationId, text, Authorization: "Bearer <CIAM token>" }
-    │
-    ↓
-Express: authMiddleware
-  → validates CIAM Bearer token
-  → attaches decoded claims to req.user
-    │
-    ↓
-Express: /send route handler
-  → Zod validates request body (SendRequestSchema.parse)
-  → calls client.sendActivityStreaming(activity, conversationId)
-    │
-    ↓ (iterates AsyncGenerator)
-CopilotStudioClient → Power Platform API (HTTPS)
-  ← stream of Activity objects
-    │
-    ↓
-normalizeActivity(act): Activity → NormalizedMessage
-  → filters typing indicators, maps card attachments, handles EndOfConversation
-    │
-    ↓
-res.json({ messages: NormalizedMessage[] })
-    │
-    ↓
-chatApi.ts receives response
-    │
-    ↓
-chatStore.ts: append messages to state
-    │
-    ↓
-ChatTranscript re-renders: new MessageBubble or CardRenderer per message
+```typescript
+// Add to ConversationStore.ts interface
+export interface StoredConversation {
+  // Existing fields
+  externalId: string;
+  sdkConversationRef: unknown;
+  history: NormalizedMessage[];
+
+  // New fields (v1.4+)
+  userId: string;           // From req.user.oid (Entra OID, stable user identifier)
+  tenantId: string;         // From req.user.tid (org tenant ID)
+  createdAt: number;        // Timestamp (ms) — used as sorted set score
+  updatedAt: number;        // Timestamp (ms) — updated on each message
+  status: 'active' | 'archived' | 'deleted'; // Conversation lifecycle
+
+  // Workflow fields (v1.5 prep)
+  workflowState?: WorkflowState;
+  extractedPayload?: ExtractedPayload;
+}
 ```
 
-### Request Flow: Adaptive Card Submission
+**Why these fields:**
 
-```
-User fills card fields, clicks Submit
-    │
-    ↓
-CardRenderer.tsx: onExecuteAction callback fires
-  → action.type === "Action.Submit"
-  → collect action.data (merged inputs + card data)
-  → mark card as disabled / pending in local state
-    │
-    ↓
-chatApi.ts: POST /api/chat/card-action
-  { conversationId, actionType, data, Authorization: "Bearer <CIAM token>" }
-    │
-    ↓
-Express: authMiddleware → validates token
-    │
-    ↓
-Express: /card-action route handler
-  → CardActionRequestSchema.parse(req.body)
-  → ACTION_ALLOWLIST check on actionType
-  → if fail → 403 (card stays disabled, error toast shown)
-    │
-    ↓ (if allowed)
-CopilotStudioClient.sendActivityStreaming(
-  { type: 'message', value: data, channelData: { actionType } },
-  conversationId
-)
-    │ ← stream of Activity objects from Copilot
-    ↓
-normalizeActivity → NormalizedMessage[]
-    │
-    ↓
-res.json({ messages })
-    │
-    ↓
-chatStore: append agent response messages
-  + mark submitted card as "completed" (not re-enabled)
-    │
-    ↓
-ChatTranscript re-renders; MetadataDrawer timeline appends card action entry
-```
-
-### Conversation Start Flow
-
-```
-App mounts / user opens chat
-    │
-    ↓
-useEffect in ChatTranscript (or App init)
-    │
-    ↓
-chatApi.ts: POST /api/chat/start  { Authorization: "Bearer <CIAM token>" }
-    │
-    ↓
-Express: authMiddleware
-    │
-    ↓
-/start route: client.startConversationStreaming(true)
-  → consume greeting activities from Copilot
-  → normalizeActivity on each
-    │
-    ↓
-res.json({ conversationId: string, messages: NormalizedMessage[] })
-    │
-    ↓
-chatStore: set conversationId, set initial messages
-    │
-    ↓
-ChatTranscript renders greeting (text or card)
-```
-
-### State Management
-
-```
-chatStore (Zustand)
-    │
-    ├── conversationId: string | null
-    ├── messages: NormalizedMessage[]        ← append-only; source of truth for transcript
-    ├── pendingCardIds: Set<string>          ← cards waiting for server response
-    ├── completedCardIds: Set<string>        ← submitted cards to keep disabled
-    ├── isLoading: boolean                   ← global spinner / skeleton state
-    └── error: string | null                 ← toast source
-
-Components subscribe selectively:
-  ChatTranscript    → messages
-  CardRenderer      → pendingCardIds, completedCardIds
-  MetadataDrawer    → messages (filter type === 'adaptiveCard' and completed)
-  InputBar          → isLoading (disable during in-flight request)
-```
+- `userId, tenantId` — enable row-level security queries (future auth enhancement)
+- `createdAt, updatedAt` — enable chronological sorted set indexes and TTL policies
+- `status` — soft-delete support, archiving without data loss
+- Workflow fields — prepared for v1.5 orchestrator (already defined in existing schemas)
 
 ---
 
-## Build Order (Dependencies Between Components)
+### 4. **Secondary Index Pattern via Sorted Sets**
 
-Build in this order to avoid blocking work:
+**Use case:** Phase 1.5 feature "List user's conversations"
 
-| Phase | Components | Why This Order |
-|-------|-----------|----------------|
-| 1 | `shared/` Zod schemas (`NormalizedMessage`, request/response types) | Everything else imports from here; no deps |
-| 2 | Server auth middleware | Required before any route can be tested end-to-end |
-| 3 | Server `/api/chat/start` + `normalizer` | Establishes conversation lifecycle; normalizer unit-testable in isolation |
-| 4 | Server `/api/chat/send` | Depends on normalizer and client factory from step 3 |
-| 5 | Server `/api/chat/card-action` + allowlist | Depends on normalizer; allowlist can be configured independently |
-| 6 | Client `chatStore` + `chatApi.ts` | Pure TypeScript; testable without rendering |
-| 7 | Client `ChatTranscript` + `MessageBubble` | Text-only chat working end-to-end |
-| 8 | Client `CardRenderer` + submit flow | Builds on working transcript; adds Adaptive Card dependency |
-| 9 | Client `MetadataDrawer` + timeline | Reads from existing store; no new API surface |
-| 10 | Theming, loading skeletons, error toasts | UI polish; no architectural risk |
-| 11 | CI, `.env.example`, README, Adaptive Cards Playbook doc | Documentation and automation last |
+**Example route (future):**
 
----
+```typescript
+// GET /api/chat/conversations?limit=20&days=7
+chatRouter.get('/conversations', async (req, res) => {
+  const { limit = 20, days = 7 } = req.query;
+  const user = req.user; // From auth middleware
 
-## Scaling Considerations
+  // Timestamp range: last 7 days
+  const now = Date.now();
+  const sevenDaysAgo = now - (days as number) * 24 * 60 * 60 * 1000;
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0–100 concurrent users | Single Express process; `CopilotStudioClient` as module-level singleton is fine; no session store needed (conversationId passed by client) |
-| 100–1k concurrent | Add process clustering (`cluster` module or PM2); conversationId stateless pass-through means no sticky sessions needed |
-| 1k+ concurrent | Horizontal scaling behind load balancer; consider rate-limiting per-user on card-action endpoint; evaluate SSE streaming for lower perceived latency |
+  // Using store interface (works with both InMemory and Redis)
+  const conversations = await (conversationStore as RedisStore)
+    .listByUserRange(user.oid, sevenDaysAgo, now);
 
-### Scaling Priorities
+  res.json({
+    count: conversations.length,
+    conversations: conversations.slice(0, limit as number),
+  });
+});
+```
 
-1. **First bottleneck:** CopilotStudioClient token refresh — JWT expires; implement token caching with refresh before expiry.
-2. **Second bottleneck:** Synchronous activity collection per request — long Copilot response times block Node event loop; SSE streaming offloads this.
+**Sorted set implementation in RedisStore:**
 
----
+```typescript
+async listByUserRange(
+  userId: string,
+  minScore: number,
+  maxScore: number,
+): Promise<StoredConversation[]> {
+  // ZRANGE key min max BYSCORE LIMIT offset count
+  const members = await this.client.zrange(
+    `user:${userId}:conversations`,
+    minScore,
+    maxScore,
+    'BYSCORE',
+    'LIMIT',
+    0,
+    100,
+  );
 
-## Anti-Patterns
+  return Promise.all(
+    members.map((id) => this.get(id as string)),
+  ).then((convs) => convs.filter((c) => c !== undefined));
+}
+```
 
-### Anti-Pattern 1: CopilotStudioClient in the Browser
+**Why sorted sets:**
 
-**What people do:** Import `@microsoft/agents-copilotstudio-client` directly into the React app to avoid building a server.
-
-**Why it's wrong:** Exposes `clientSecret`, environment ID, and the Power Platform API token to anyone who inspects network requests. The official Microsoft sample that does run client-side uses interactive user login (MSAL popup) — not suitable for a production app with CIAM-authenticated users who shouldn't re-authenticate.
-
-**Do this instead:** Always instantiate `CopilotStudioClient` in the Node server only. Pass only the `conversationId` and normalized messages to the client.
-
-### Anti-Pattern 2: Parallel Type Definitions (Manual TS Interfaces in Client + Server)
-
-**What people do:** Define `Message` interface separately in `client/src/types/` and `server/src/types/` and keep them "in sync" manually.
-
-**Why it's wrong:** They drift. A field added to the server normalizer won't be reflected client-side until someone remembers to update the interface. Runtime errors manifest as undefined fields.
-
-**Do this instead:** Single Zod schema in `shared/`; `z.infer` generates the TypeScript type used everywhere.
-
-### Anti-Pattern 3: Forwarding Raw Copilot Activity to the Browser
-
-**What people do:** `res.json(rawActivities)` — send the full `Activity[]` from Copilot directly to the client.
-
-**Why it's wrong:** `Activity` objects contain Bot Framework metadata, channel-specific fields, and potentially sensitive watermark data. The client now depends on Bot Framework schema details and can break on SDK updates.
-
-**Do this instead:** Always run activities through `normalizeActivity()` and return only `NormalizedMessage[]`. The normalizer is the schema firewall between internal SDK and the public API surface.
-
-### Anti-Pattern 4: Card Submission Directly to Copilot Without Allowlist
-
-**What people do:** Accept any `actionType` from the card payload and forward it verbatim to Copilot.
-
-**Why it's wrong:** A crafted card payload can trigger unintended Copilot actions, invoke plugins, or access data the user shouldn't reach.
-
-**Do this instead:** `ACTION_ALLOWLIST.has(body.actionType)` check before forwarding. Treat Adaptive Card submissions as untrusted user input, not trusted application data.
-
-### Anti-Pattern 5: Storing conversationId Server-Side Only (Session Map)
-
-**What people do:** Server assigns and stores `conversationId` in a server-side session; client sends a session cookie.
-
-**Why it's wrong:** Introduces sticky sessions or a shared session store (Redis) as a scaling requirement from day one. Adds state management complexity.
-
-**Do this instead:** `conversationId` is returned from `/start` and included by the client in every subsequent request. Server is stateless; `conversationId` is the client's responsibility to persist (sessionStorage or React state).
+- O(log N + M) where M is result count (vs. O(N) scan)
+- Enables range queries (createdAt range, status filtering via key naming)
+- No explicit index maintenance needed (ZADD on every write)
+- Scales to millions of conversations per user
 
 ---
 
 ## Integration Points
 
-### External Services
+### 1. **Chat Routes (chat.ts) — MINIMAL CHANGES**
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| Microsoft Copilot Studio | `CopilotStudioClient.startConversationStreaming` / `sendActivityStreaming` — server-side only | Requires JWT with `CopilotStudio.Copilots.Invoke` scope; acquired via MSAL client credentials or OBO |
-| CIAM / Entra ID (auth provider) | Bearer token validated in Express middleware on every request | v1: stub placeholder that logs claims; real validation plugs in without changing routes |
-| MSAL OBO flow | Server exchanges incoming CIAM user token for Copilot Studio-scoped token | v1: TODO comment stub; real OBO uses `@azure/msal-node` `ConfidentialClientApplication.acquireTokenOnBehalfOf` |
+**Current behavior (works with Redis too):**
 
-### Internal Boundaries
+```typescript
+// /start endpoint
+const conversation = {
+  externalId,
+  sdkConversationRef: collectedActivities,
+  history: [],
+};
+await conversationStore.set(externalId, conversation);
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| client/ ↔ server/ | HTTPS REST; JSON bodies; `Authorization: Bearer` header | Defined by shared Zod schemas; Vite proxy in dev |
-| server/ ↔ shared/ | TypeScript import; `@aaae/shared` workspace package | Server calls `Schema.parse()` to validate; normalizer returns `NormalizedMessage` |
-| client/ ↔ shared/ | TypeScript import; `@aaae/shared` workspace package | Client uses `NormalizedMessage` type to render; never validates (server already did) |
-| CardRenderer ↔ chatStore | React callback → Zustand action | `onExecuteAction` triggers `submitCardAction` store action which calls `chatApi.ts` |
-| normalizer ↔ CopilotStudioClient | Function call; receives `Activity`, returns `NormalizedMessage \| null` | `null` when activity type is `typing` or `endOfConversation` (filtered out of response) |
+// /send endpoint
+const conversation = await conversationStore.get(conversationId);
+// ... Copilot call ...
+await conversationStore.set(conversationId, {
+  ...conversation,
+  history: [...conversation.history, ...messages],
+});
+```
+
+**Required changes:** Populate new fields from JWT claims
+
+```typescript
+// In /start handler, after Copilot call
+const conversation: StoredConversation = {
+  externalId,
+  sdkConversationRef: collectedActivities,
+  history: [],
+  userId: req.user.oid,        // From auth middleware
+  tenantId: req.user.tid,      // From auth middleware
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+  status: 'active',
+};
+await conversationStore.set(externalId, conversation);
+
+// In /send handler
+await conversationStore.set(conversationId, {
+  ...conversation,
+  history: [...conversation.history, ...messages],
+  updatedAt: Date.now(),  // Update timestamp
+});
+```
+
+**Impact:** Routes stay simple, auth middleware provides user context, store handles persistence complexity.
+
+---
+
+### 2. **Health Check Endpoint (app.ts) — ENHANCED**
+
+**Current behavior:**
+
+```typescript
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', authRequired: config.AUTH_REQUIRED });
+});
+```
+
+**Required enhancement:**
+
+```typescript
+app.get('/health', async (_req, res) => {
+  try {
+    // If Redis is configured, check its connectivity
+    if (conversationStore instanceof RedisStore) {
+      await conversationStore.ping(); // New method
+      res.json({
+        status: 'ok',
+        redis: 'connected',
+        authRequired: config.AUTH_REQUIRED,
+      });
+    } else {
+      res.json({
+        status: 'ok',
+        store: 'memory',
+        authRequired: config.AUTH_REQUIRED,
+      });
+    }
+  } catch (err) {
+    console.error('[health] Redis check failed:', err);
+    res.status(503).json({
+      status: 'unavailable',
+      redis: 'disconnected',
+      error: (err as Error).message,
+    });
+  }
+});
+```
+
+**Graceful failure:** Returns 503 when Redis unavailable (no silent fallback to InMemory). Deployment orchestrators detect 503 and trigger alerts/remediation.
+
+---
+
+### 3. **Configuration (config.ts) — NEW VARS**
+
+**Add to config.ts:**
+
+```typescript
+export const config = {
+  // ... existing vars ...
+
+  // Redis configuration (v1.4)
+  REDIS_URL: process.env.REDIS_URL, // e.g., "rediss://myapp.redis.cache.windows.net:6380"
+  REDIS_TIMEOUT_MS: Number(process.env.REDIS_TIMEOUT_MS ?? 5000),
+  REDIS_TTL_DAYS: Number(process.env.REDIS_TTL_DAYS ?? 30),
+} as const;
+```
+
+**Environment examples:**
+
+```bash
+# Local development (no Redis needed)
+# Leave REDIS_URL unset
+
+# Azure Cache for Redis (Premium tier with TLS)
+REDIS_URL=rediss://myapp.redis.cache.windows.net:6380
+REDIS_PASSWORD=<access-key>
+REDIS_TIMEOUT_MS=5000
+REDIS_TTL_DAYS=30
+
+# Or with connection string from Azure portal
+REDIS_URL=rediss://:defaultkey@myapp.redis.cache.windows.net:6380
+```
+
+---
+
+### 4. **Middleware Chain — NO CHANGES NEEDED**
+
+The auth middleware and orgAllowlist middleware run before routes, populate `req.user` with UserClaims. Routes then use `req.user.oid` and `req.user.tid` to populate store fields.
+
+**Data flow:**
+
+```
+Request → CORS → JSON → [/health: skip auth] or [/api: auth → orgAllowlist] → Route
+                                                                                  ↓
+                                                             Route accesses req.user
+                                                                    ↓
+                                                      Populates StoredConversation
+                                                                    ↓
+                                                             Store.set() (any backend)
+```
+
+---
+
+## New vs Modified Components
+
+| Component | Status | Scope |
+|-----------|--------|-------|
+| `server/src/store/RedisStore.ts` | NEW | Redis implementation of ConversationStore interface |
+| `server/src/store/createStore.ts` | NEW | Factory function for store selection |
+| `shared/src/schemas/storedConversation.ts` | MODIFIED | Add userId, tenantId, createdAt, updatedAt, status |
+| `server/src/routes/chat.ts` | MODIFIED | Populate new StoredConversation fields in /start, /send, /card-action |
+| `server/src/app.ts` | MODIFIED | Enhance /health with Redis ping check |
+| `server/src/config.ts` | MODIFIED | Add REDIS_URL, REDIS_TIMEOUT_MS, REDIS_TTL_DAYS |
+| `server/src/store/index.ts` | MODIFIED | Use createStore() factory instead of hardcoded InMemoryStore |
+| `server/.env.example` | MODIFIED | Add REDIS_URL (optional) |
+| Tests (new) | NEW | RedisStore unit tests, health check integration tests |
+
+---
+
+## Build Order & Dependency Chain
+
+**Phase 1 (Foundation — 1-2 days)**
+1. Expand StoredConversation schema in shared/
+   - Add userId, tenantId, createdAt, updatedAt, status fields
+   - Rebuild shared/ (`npm run build`)
+2. Create ConversationStore interface additions (listByUser, delete, ping)
+3. Create RedisStore.ts implementation
+   - Imports: ioredis, ConversationStore interface
+   - Implements all interface methods
+
+**Phase 2 (Integration — 1-2 days)**
+4. Create createStore.ts factory
+   - Depends on: RedisStore, InMemoryStore
+   - Returns ConversationStore (works with both)
+5. Update store/index.ts to use createStore()
+   - No route changes yet
+6. Add config vars (REDIS_URL, REDIS_TIMEOUT_MS, REDIS_TTL_DAYS)
+7. Update .env.example with Redis vars
+
+**Phase 3 (Routes & Health — 1 day)**
+8. Modify chat.ts routes to populate new fields from req.user
+   - userId: req.user.oid
+   - tenantId: req.user.tid
+   - createdAt, updatedAt: Date.now()
+   - status: 'active'
+9. Enhance /health endpoint with Redis ping
+10. Update app.ts to handle 503 from health check
+
+**Phase 4 (Testing — 1 day)**
+11. Unit tests for RedisStore
+    - get/set/delete with JSON serialization
+    - Sorted set operations (listByUser, listByUserRange)
+    - TTL expiry edge cases
+12. Integration tests for store factory
+    - Verify InMemoryStore used when REDIS_URL unset
+    - Verify RedisStore used when REDIS_URL set
+13. Health check tests
+    - 200 when Redis connected
+    - 503 when Redis unavailable
+14. End-to-end test with live Redis (or mock via testcontainers)
+
+**Dependency graph:**
+
+```
+shared schema expansion
+        ↓
+   RedisStore ─┐
+        ↓      ├─→ createStore factory
+   InMemoryStore─┘
+        ↓
+   store/index.ts update
+        ↓
+   chat.ts route updates + config updates
+        ↓
+   app.ts health check update
+        ↓
+   Tests
+```
+
+---
+
+## Failure Modes & Resilience
+
+### Scenario 1: Redis Unavailable on Startup
+
+**Current behavior:** `createStore()` returns InMemoryStore, app boots successfully.
+**Desired behavior (v1.4):** If REDIS_URL is set but unreachable, fail fast.
+
+**Solution:** Test connection in createStore() or health check:
+
+```typescript
+export async function createStore(): Promise<ConversationStore> {
+  if (config.REDIS_URL) {
+    const redisClient = new Redis(config.REDIS_URL, { /* ... */ });
+
+    // Fail fast if Redis unavailable
+    try {
+      await redisClient.ping();
+    } catch (err) {
+      console.error('[store] FATAL: Redis unavailable but REDIS_URL is set');
+      process.exit(1);
+    }
+
+    return new RedisStore(redisClient);
+  }
+  return new InMemoryConversationStore();
+}
+```
+
+**Rationale:** Prevents silent data loss (InMemory fallback would lose all conversations on restart).
+
+---
+
+### Scenario 2: Redis Network Timeout During Request
+
+**Current behavior:** Route handler hangs, client sees timeout.
+**Desired behavior:** Fast-fail with 503 Service Unavailable.
+
+**Solution:** Set timeouts on ioredis client:
+
+```typescript
+const redisClient = new Redis(config.REDIS_URL, {
+  connectTimeout: 5000,       // 5 second connection timeout
+  commandTimeout: 5000,       // 5 second command timeout
+  retryStrategy: () => null,  // Don't retry, fail fast
+  maxRetriesPerRequest: 0,    // 0 retries
+});
+
+redisClient.on('error', (err) => {
+  console.error('[store] Redis command failed:', err);
+  // Application continues but /health check returns 503
+});
+```
+
+**Impact:** Routes receive immediate error from RedisStore.get/set, catch block sends 502. Observability tools see pattern and alert.
+
+---
+
+### Scenario 3: Conversation Key Expires in Redis
+
+**Current behavior:** Store.get(id) returns undefined, route sends 404.
+**Desired behavior:** Same — expected behavior for TTL.
+
+**TTL strategy:**
+
+- Primary key (conversation:{externalId}): 30 days
+- Sorted set index: no explicit TTL, cleaned up when primary expires
+- Soft-delete via status field: archive without TTL override
+
+**For longer-lived sessions:** Implement "touch on read" to extend TTL:
+
+```typescript
+async get(id: string): Promise<StoredConversation | undefined> {
+  const json = await this.client.get(`conversation:${id}`);
+  if (json) {
+    // Extend TTL on each read (e.g., sliding window)
+    await this.client.expire(`conversation:${id}`, 30 * 24 * 60 * 60);
+  }
+  return json ? JSON.parse(json) : undefined;
+}
+```
+
+---
+
+## Scalability Considerations
+
+### Single Instance
+
+- InMemoryStore: LRU evicts after 100 conversations
+- RedisStore: Limited by Redis memory, typically 1-10GB per instance
+
+### Multiple Instances Behind Load Balancer
+
+**InMemoryStore:** Each instance has separate LRU cache, conversations not shared.
+- User A starts conversation on Instance 1
+- Load balancer routes User A to Instance 2
+- Instance 2 has no conversation (404)
+- Broken experience
+
+**RedisStore:** All instances read/write same Redis:
+- User A starts conversation on Instance 1 → written to Redis
+- Load balancer routes User A to Instance 2
+- Instance 2 reads from Redis (same store) → found
+- Seamless experience, rolling deploys work
+
+### At 10K+ Active Conversations
+
+- **InMemoryStore:** Single instance max ~100 (LRU limit)
+- **RedisStore:** ~10K on single 1GB Redis, ~100K on 10GB, ~1M+ on cluster
+
+**Sorted set queries (listByUser):**
+- 10 instances, 1000 convs/user: ZRANGE in O(log 10000 + 1000) milliseconds
+- 100 instances, 10K convs/user: Same O(log 100000 + 10000) 10-20ms
+- Redis Cluster: Sharding spreads load across nodes
+
+---
+
+## Architecture Decision Record
+
+| Decision | Rationale | Implication |
+|----------|-----------|------------|
+| Use ConversationStore interface (no change for Redis) | Minimizes route impact, leverages existing abstraction | Routes never import Redis types |
+| Factory pattern (createStore) | Single decision point, testable, extensible | Easy to add other stores later |
+| JSON.stringify/parse (not Redis JSON module) | Keeps stack simple, no module dependency | Slightly more CPU on serialization, negligible vs network latency |
+| Sorted sets for secondary index | Enables efficient range queries, O(log N) lookups | Need to maintain both primary key + sorted set |
+| TTL on primary key only | Consistent expiry logic, no orphaned indexes | Sorted set entries stale after primary expires (not a problem) |
+| Graceful failure (503, not fallback) | Honest about dependencies, prevents silent data loss | Deployments must address Redis availability |
+| Config vars (REDIS_URL, TTL_DAYS) | Deployment flexibility, different TTLs per environment | More env vars, but documented in .env.example |
+
+---
+
+## Known Limitations & Future Work
+
+### v1.4 Scope Limitations
+
+- No Redis Cluster support yet — single Redis instance only
+- No conversation archival UI — status field added but no endpoints
+- No encryption at rest — Redis data unencrypted
+- No pub/sub for real-time updates — InMemory also lacks this
+
+### Potential v1.5+ Enhancements
+
+- Distributed locks (via Redis) — prevent concurrent writes to same conversation
+- Lua scripting — atomic multi-operation updates
+- Keyspace notifications — emit events when conversations expire
+- Persistence strategy — AOF (every second) for crash recovery, RDB dumps for backups
 
 ---
 
 ## Sources
 
-- [CopilotStudioClient class — Microsoft Learn (JS API Reference)](https://learn.microsoft.com/en-us/javascript/api/@microsoft/agents-copilotstudio-client/copilotstudioclient?view=agents-sdk-js-latest) — HIGH confidence; official docs updated 2025-12-18
-- [Integrate with web or native apps using M365 Agents SDK — Microsoft Learn](https://learn.microsoft.com/en-us/microsoft-copilot-studio/publication-integrate-web-or-native-app-m365-agents-sdk) — HIGH confidence; official docs updated 2025-12-12
-- [Integrate with Copilot Studio — Microsoft 365 Agents SDK docs](https://learn.microsoft.com/en-us/microsoft-365/agents-sdk/integrate-with-mcs) — HIGH confidence; official docs updated 2025-11-26
-- [microsoft/Agents GitHub — copilotstudio-webchat-react sample](https://github.com/microsoft/Agents/tree/main/samples/nodejs/copilotstudio-webchat-react) — HIGH confidence; official Microsoft sample repo
-- [microsoft/Agents GitHub — copilotstudio-client Node sample](https://github.com/microsoft/Agents/tree/main/samples/nodejs/copilotstudio-client) — HIGH confidence; official Microsoft sample repo
-- [@microsoft/agents-copilotstudio-client API docs](https://microsoft.github.io/Agents-for-js/modules/_microsoft_agents-copilotstudio-client.html) — HIGH confidence; official generated API docs
-- [Adaptive Cards Action.Submit schema](https://adaptivecards.io/explorer/Action.Submit.html) — HIGH confidence; official Adaptive Cards site
-- [Adaptive Cards JavaScript SDK — Microsoft Learn](https://learn.microsoft.com/en-us/adaptive-cards/sdk/rendering-cards/javascript/getting-started) — HIGH confidence; official docs
-- [Sharing Types and Validations with Zod Across a Monorepo — Leapcell](https://leapcell.io/blog/sharing-types-and-validations-with-zod-across-a-monorepo) — MEDIUM confidence; community article, consistent with official Zod docs and npm workspaces docs
+### Core Research
+
+- [Express.js Tutorial (2026): Practical, Scalable Patterns](https://thelinuxcode.com/expressjs-tutorial-2026-practical-scalable-patterns-for-real-projects/)
+- [ioredis GitHub Repository](https://github.com/redis/ioredis)
+- [Redis Secondary Indexing Patterns](https://redis.io/docs/latest/develop/clients/patterns/indexes/)
+- [Redis Sorted Sets Documentation](https://redis.io/docs/latest/develop/data-types/sorted-sets/)
+- [Factory Method Pattern in TypeScript and Node.js](https://medium.com/@diegomottadev/factory-method-pattern-implementation-using-typescript-and-node-js-6ac075967f22)
+
+### Persistence & TTL
+
+- [Redis TTL Management](https://redis.io/docs/latest/commands/expire/)
+- [Redis Persistence Options (RDB vs AOF)](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
+- [Managing Key Expiration in Redis with JavaScript](https://codesignal.com/learn/courses/mastering-redis-for-high-performance-applications-with-nodejs/lessons/managing-key-expiration-in-redis-with-javascript)
+
+### Health Checks & Monitoring
+
+- [ioredis Connection Pooling Guide](https://www.w3tutorials.net/blog/ioredis-connection-pool-nodejs-example/)
+- [redis-healthcheck npm Package](https://www.npmjs.com/package/redis-healthcheck)
+- [How to Configure Connection Pooling for Redis](https://oneuptime.com/blog/post/2026-01-25-redis-connection-pooling/view)
+
+### Multi-Instance Scaling
+
+- [Redis for Multi-Tenant Applications](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/cache-redis)
+- [Scaling Stateful Services with Redis](https://medium.com/@jayanthpawar18/redis-beyond-caching-deploying-stateful-services-to-scale-backend-systems-b6f07dc0e9a9)
+- [Horizontal Scaling with Redis Pub/Sub](https://medium.com/walkme-engineering/horizontal-scaling-of-a-stateful-server-with-redis-pub-sub-fc56c875b1aa)
+
+### JSON Serialization
+
+- [Caching JSON Data in Redis with Node.js](https://www.geeksforgeeks.org/node-js/how-to-cache-json-data-in-nodejs/)
+- [Redis JSON Data Type Documentation](https://redis.io/docs/latest/develop/data-types/json/)
+- [RedisOM for Node.js](https://redis.io/docs/latest/integrate/redisom-for-node-js/)
 
 ---
 
-*Architecture research for: React + Node proxy chat app — Microsoft Copilot Studio + Adaptive Cards*
-*Researched: 2026-02-19*
+**Last Updated:** 2026-02-21
+**Status:** Research Complete — Ready for Phase Planning

@@ -1,258 +1,415 @@
 # Project Research Summary
 
-**Project:** aaae — Custom Copilot Studio Chat Canvas
-**Domain:** React + Node monorepo chat app — Microsoft Copilot Studio (M365 Agents SDK) + Adaptive Cards
-**Researched:** 2026-02-19
-**Confidence:** MEDIUM-HIGH
+**Project:** Agentic Copilot Chat App — React + Node monorepo with Microsoft Copilot Studio & Adaptive Cards
+**Domain:** Enterprise chat UI with conversational AI, persistent state store (v1.4), and workflow orchestration prep (v1.5)
+**Researched:** 2026-02-19 (core); 2026-02-21 (Redis v1.4 extension)
+**Confidence:** HIGH (stack, features, architecture); MEDIUM-HIGH (pitfalls + Redis integration)
+
+---
 
 ## Executive Summary
 
-This project is a custom enterprise chat canvas that wraps Microsoft Copilot Studio via the M365 Agents SDK, rendering both plain text and Adaptive Cards in a bespoke React UI. The canonical implementation pattern — verified across official Microsoft docs, official SDK samples, and the Agents GitHub repo — is a mandatory server-side proxy: the `CopilotStudioClient` from `@microsoft/agents-copilotstudio-client` runs exclusively on a Node/Express server, and the React client communicates only with that Express API over a thin, Zod-typed REST contract. This two-tier architecture is non-negotiable: Copilot Studio credentials must never reach the browser, and all card action submissions must be validated server-side before they reach the agent.
+This is a full-stack chat application that bridges custom React UIs with Microsoft Copilot Studio agents through an Express proxy server. The architecture is well-defined: a React 18 + Vite client sends messages to an Express server, which translates them to the Copilot Studio SDK and normalizes responses through Zod schemas back to the client. The v1.4 milestone adds Redis persistence (Azure Cache for Redis) to replace the in-memory conversation store, enabling multi-instance scaling and preparing for the v1.5 Workflow Orchestrator.
 
-The recommended technology set is well-established for greenfield projects as of early 2026. React 18 (not 19) is required because the Adaptive Cards JS SDK has no React 18+ wrapper — the official `adaptivecards-react` package is effectively abandoned, and the correct pattern is a 30-line custom `useRef`/`useEffect` wrapper over the `adaptivecards` v3 JS SDK. The rest of the stack (Vite 6, Express 5, TypeScript 5.8, Tailwind CSS v4, Zod v4, npm workspaces, Vitest) is stable and consistently recommended. The M365 Agents SDK itself (`@microsoft/agents-copilotstudio-client` v1.2.3) reached GA in September 2025 and the deprecated non-streaming methods (`askQuestionAsync`, `sendActivity`) must not be used — the streaming async-generator API is the only supported path.
+**Recommended approach:** Build in phases that respect architectural dependencies. Foundation first (server scaffold with auth + store interface abstraction), then client UI (chat transcript + Adaptive Card rendering), then enhanced features (metadata sidebar, card action validation). The v1.4 Redis extension is a drop-in replacement via a factory pattern — preserve the ConversationStore interface to minimize route changes.
 
-The highest risks are security-related and must be designed in from day one: DirectLine credentials leaking into Vite env vars, card action payloads being forwarded to Copilot without server-side allowlist validation, and auth middleware stubs configured to fail-open. A secondary cluster of risks is functional: Adaptive Card rendering produces visually correct but non-interactive cards when mounted via `dangerouslySetInnerHTML`, cards silently drop elements when the renderer's `maxVersion` does not match the card schema version, and submitted cards must be immediately disabled to prevent duplicate action submissions. These are not edge cases — they are the most common failure modes reported in official GitHub issues and the Microsoft Security Blog.
+**Key risks:** (1) DirectLine secrets exposed in the browser — prevent via server-only SDK calls and CI credential scanning. (2) Adaptive Card events destroyed by dangerouslySetInnerHTML — use adaptivecards-react with proper event delegation. (3) Redis silent fallback masking persistence failures — fail loudly with 503, never silently degrade. (4) Card submissions duplicated without pending state or idempotency. (5) Serialization bugs with opaque SDK references and date objects in Redis. All are avoidable with explicit test cases during implementation.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The core stack is a React 18 SPA (Vite 6 build) communicating with an Express 5 API server, organized as an npm workspaces monorepo with three packages: `shared/` (Zod schemas, no external runtime deps), `server/` (Express proxy, MSAL, Copilot SDK), and `client/` (React, Tailwind, Adaptive Cards renderer). TypeScript 5.8+ is required throughout. Zod v4 (stable since mid-2025) is the schema layer — start on v4 for a greenfield project and declare it as a dep in `shared/` only to prevent dual-instance hoisting bugs.
+**Node.js 20 LTS** (targets Microsoft SDK v1.2.3+) → **Express 5.x** (stable since 2025, TypeScript support via @types/express ^5.0.6) → **React 18** (ecosystem tested; v19 not yet matched by Copilot integrations) → **Vite 6** (Nov 2024 stable, @tailwindcss/vite plugin eliminates PostCSS config) → **TypeScript 5.8+** (for Node.js type stripping) → **Tailwind CSS 4** (released early 2025).
 
-The two Microsoft-specific constraints that shape the stack most significantly are: (1) `@microsoft/agents-copilotstudio-client` targets Node 20+ and must never run in a browser, and (2) there is no usable React wrapper for Adaptive Cards — `adaptivecards-react` has not been maintained for React 18 (confirmed by Microsoft in Sep 2023) and `adaptivecards-react@1.1.1` causes rendering bugs under React 18 concurrent mode. The replacement is a ~30-line custom component using `useRef` + `useEffect` wrapping the `adaptivecards` v3 JS SDK directly.
+**Microsoft Integration:** `@microsoft/agents-copilotstudio-client@^1.2.3` (GA Sep 2025, server-side only), `@azure/msal-node@^3.8.7` (MSAL OBO token stubs for v1), `adaptivecards@^3.0.5` + custom React wrapper (avoid abandoned `adaptivecards-react` — use 30-line useRef+useEffect pattern documented in STACK.md).
 
-**Core technologies:**
-- React 18.x: Client UI framework — React 19 explicitly excluded; ecosystem (Adaptive Cards, MSAL) tested on 18
-- Vite 6: Client build tool — `@tailwindcss/vite` plugin; zero PostCSS config; Vite 6 = Node 20/22 only
-- Node.js 20 LTS: Server runtime — required by `@microsoft/agents-copilotstudio-client`
-- TypeScript 5.8+: Type system — `module: "node20"` in tsconfig; required for Zod v4 compatibility
-- Express 5.2.x: HTTP server — now stable (`latest` tag on npm); use `@types/express@^5.0.6`
-- `@microsoft/agents-copilotstudio-client` v1.2.3: Copilot SDK — GA Sep 2025; server-side only; use streaming API exclusively
-- `@azure/msal-node` v3.8.7: MSAL token acquisition — `ConfidentialClientApplication` for client-credentials and OBO flows
-- `adaptivecards` v3.0.5: Adaptive Cards renderer — official JS SDK; use custom React wrapper, not `adaptivecards-react`
-- Zod v4: Shared schema/validation — 14x faster than v3; declare in `shared/` only
-- Tailwind CSS v4: Styling — no PostCSS config; `@import "tailwindcss"` in CSS file
-- Vitest 4: Testing — shares Vite config; use `--workspace` flag for monorepo
+**State & Validation:** Zod ^3.25.76 pinned in `shared/` (single instance enforced in CI), npm workspaces (built-in monorepo tool per PROJECT.md).
 
-**What NOT to use:**
-- `adaptivecards-react@1.1.1` — abandoned, breaks React 18 concurrent mode
-- `startConversationAsync` / `askQuestionAsync` / `sendActivity` — deprecated SDK methods
-- Next.js — explicitly excluded by PROJECT.md; SSR adds complexity without benefit for a proxied API
-- `@microsoft/msal-browser` on the server — browser-only, crashes in Node
-- Zod v3 — use v4 for all greenfield code
+**v1.4 Redis:** `ioredis@^5.9.0` (handles Azure Cache TLS automatically with rediss:// scheme) + `ioredis-mock@^5.11.0` (unit testing without external Redis). Never use legacy `redis` npm package or `redis-mock`.
+
+**Why this stack:** Each technology has HIGH-confidence sources from official Microsoft docs, npm registry, or long-term project sponsorship (e.g., ioredis used at scale by Alibaba). No experimental dependencies. Version pinning and workspace isolation prevent runtime surprises.
 
 ### Expected Features
 
-The product must deliver a full enterprise chat experience with Adaptive Cards as the primary interaction modality. All table-stakes features are required for v1; the differentiators are what separate this from the default Copilot Studio canvas. Several commonly-requested features are explicitly anti-features for v1 — most importantly, token-by-token streaming (the SDK does not support it natively) and multi-session conversation history (requires a DB + session identity model not in scope).
-
-The feature dependencies drive the build order: Zod shared schemas must exist before any API layer, `conversationId` lifecycle must exist before card actions, and Adaptive Card rendering must be working before the card disable/pending state or the timeline sidebar can be implemented.
-
-**Must have (table stakes — required for v1 launch):**
-- Message bubble transcript with user/bot visual distinction
-- Optimistic user bubble + loading skeleton (perceived responsiveness)
-- Typing/thinking indicator while awaiting Copilot response
-- Error toasts with inline bubble error state and retry affordance
-- Adaptive Card rendering inline in transcript (custom `useRef`/`useEffect` wrapper)
-- Card disabled + pending state immediately after submit (prevents double-submission — Copilot Studio explicitly warns this is the default failure mode)
-- Hybrid turn rendering (text preamble + card in a single bot activity)
+**Table stakes (v1.0 launch):**
+- Message bubble transcript (user/bot distinction, required for any chat UI)
+- Optimistic user message display + loading skeleton (eliminates perceived broken state)
+- Typing indicator + error toasts with inline bubble errors
+- Adaptive Card rendering with disabled+pending state after submit (prevents double-submission bug Copilot Studio docs explicitly warn about)
+- Hybrid turn rendering (text + card in same bot activity)
 - Conversation start / new conversation trigger
-- Responsive layout 360px to 1280px+ (PROJECT.md hard requirement)
-- Dark/light mode toggle with `prefers-color-scheme` default
-- Reduced-motion respect (`prefers-reduced-motion`) — WCAG 2.2 + EAA June 2025
-- Keyboard navigation + ARIA live regions — WCAG 2.2 Level AA (legally required in EU since June 2025)
-- Card action allowlist enforcement on both client and server
-- Normalized Zod message schema in `shared/` package
-- Activity log download (JSON serialization of normalized messages)
-- MSAL OBO token flow as a fail-closed stub (not functionally active, but correctly structured)
+- Responsive layout 360px–1280px (PROJECT.md hard requirement)
+- Dark/light mode toggle + prefers-color-scheme default (table stakes in 2026)
+- Keyboard navigation + ARIA live regions (WCAG 2.2 Level AA, EU legal requirement since June 2025)
+- Card action allowlist (client + server validation)
+- Normalized Zod message schema (shared/)
+- Activity log download (JSON serialization)
 
-**Should have (differentiators — add after core is stable):**
-- Timeline sidebar summarizing completed card actions (desktop, P2)
-- MSAL OBO token flow — real implementation (trigger: production deployment with real user identities)
-- Suggested replies rendering (trigger: Copilot Studio topics actually emit `suggestedActions`)
-- Markdown rendering in bot bubbles with sanitization (trigger: bot responses actually use markdown)
+**Competitive differentiators (v1.x):**
+- Split-pane desktop layout (transcript + metadata drawer) — not available in Copilot Studio default canvas
+- Timeline sidebar summarizing card actions (audit trail unique to this product)
+- MSAL OBO token flow stubs (architecturally correct placeholder, signals production-readiness)
 
-**Defer (v2+):**
-- Multi-session conversation history — requires DB + session identity model
-- Voice input — out of scope per PROJECT.md; significant permission/audio complexity
-- Token-by-token streaming responses — SDK does not support natively; revisit when it does
-- Collaborative/shared sessions — architecture change; validate demand first
+**Defer to v2+:**
+- Conversation history / multi-session persistence (requires DB + identity model; validate demand first)
+- Streaming token-by-token responses (Copilot SDK doesn't natively stream; v2 if SDK adds it)
+- Suggested replies rendering (depends on Copilot Studio topics producing them reliably)
+- Voice input (significant scope increase; browser permissions + audio processing)
+
+**MVP priority:** All P1 items above ship together in v1. v1.x adds P2 items (timeline sidebar, markdown rendering). P3 deferred.
 
 ### Architecture Approach
 
-The architecture is a strict two-tier proxy: React SPA (Vite dev server or static build) calls a thin Express REST API (`/api/chat/start`, `/api/chat/send`, `/api/chat/card-action`), which holds the `CopilotStudioClient` instance and the Copilot Studio credentials. Raw Bot Framework `Activity` objects from the SDK are never exposed to the client — they are normalized by a server-side `activityNormalizer.ts` into `NormalizedMessage[]` typed by the Zod schema in `shared/`. Client state is managed with Zustand: append-only message array, pending/completed card ID sets, loading flag, and error string. The `CopilotStudioClient` is stateless from the server's perspective — `conversationId` is returned on `/start` and supplied by the client on every subsequent call, so the server requires no sticky sessions.
+Express singleton receives authenticated requests → ConversationStore abstraction (interface with two implementations: InMemoryStore for dev, RedisStore for v1.4+) → Copilot SDK isolation (server-only, no browser calls) → Activity Normalizer (translates SDK Activities to NormalizedMessage[]) → Zod validation on serialization/deserialization.
 
 **Major components:**
-1. `shared/src/schemas.ts` — Zod schemas for `NormalizedMessage`, `CardActionRequest`, API request/response types; source of truth for both sides
-2. `server/middleware/auth.ts` — CIAM bearer token validation; fail-closed stub in v1; real MSAL OBO plug-in point
-3. `server/normalizer/activityNormalizer.ts` — `Activity` → `NormalizedMessage | null`; the schema firewall between SDK internals and the public API surface
-4. `server/services/copilotClient.ts` — `CopilotStudioClient` factory; isolates JWT acquisition and token refresh from route handlers
-5. `server/routes/` (`start.ts`, `send.ts`, `cardAction.ts`) — thin route handlers; Zod parse + allowlist check + SDK call + normalize + respond
-6. `client/store/chatStore.ts` — Zustand store; `messages[]`, `pendingCardIds`, `completedCardIds`, `isLoading`, `error`
-7. `client/api/chatApi.ts` — fetch wrappers for `/api/chat/*`; injects `Authorization` header; components never call fetch directly
-8. `client/components/CardRenderer.tsx` — custom `useRef`/`useEffect` wrapper over `adaptivecards` SDK; `onExecuteAction` → `chatStore.submitCardAction`
-9. `client/components/ChatTranscript.tsx` + `MessageBubble.tsx` — scrollable transcript; ARIA live region; optimistic bubbles
-10. `client/components/MetadataDrawer.tsx` — desktop sidebar; reads completed card actions from store; activity log download
 
-**Key patterns:**
-- Server-side SDK proxy: `CopilotStudioClient` server-only, `conversationId` client-owned, server stateless
-- Zod shared contract: single schema in `shared/`; `z.infer` generates types used by both packages
-- Streaming activity consumption: `for await` over `AsyncGenerator<Activity>` with collect-then-respond for v1 (SSE streaming is a v2 enhancement)
-- Action allowlist: `ACTION_ALLOWLIST.has(body.actionType)` enforced before any SDK call; `Action.OpenUrl` domain allowlist for phishing prevention
-- Store-driven card state: `pendingCardIds` set on submit, `completedCardIds` set on response — card stays disabled permanently after submit
+1. **Server scaffold (Express):** CORS + auth middleware (MSAL stubs in v1) → health check → chat routes (/start, /send, /card-action) → store interface (factory pattern selects Redis or InMemory) → Copilot SDK client (singleton, maintains conversation state server-side). No credentials exposed to client.
+
+2. **Client UI (React + Vite):** useChatApi hook (useReducer state machine with optimistic updates, 300ms skeleton delay, 3-attempt retry) → chat transcript → AdaptiveCardRenderer component (useRef+useEffect pattern, not dangerouslySetInnerHTML) → send box. All API calls proxied through server.
+
+3. **Shared schemas (Zod):** NormalizedMessage (id, role, kind, text, cardJson), StoredConversation (v1.4: adds userId, tenantId, createdAt, updatedAt, status), CardActionPayload (validated before forwarding to Copilot).
+
+4. **Redis persistence (v1.4 only):** RedisStore implements ConversationStore interface, primary keys `conversation:{externalId}`, sorted set indexes `user:{userId}:conversations` (for v1.5 feature "list user's conversations"), TTL 30 days on primary key.
+
+**Data flow:** Client chatApi.ts → useChatApi → /api/chat/start|send|card-action → [auth + orgAllowlist middleware] → [conversationStore.get/set] → [Copilot SDK call] → [Activity normalizer] → [JSON response] → client reducer updates transcript.
+
+**Why this architecture:** ConversationStore interface abstraction allows swapping implementations without changing routes (v1 InMemory → v1.4 Redis is a drop-in swap). Singleton Copilot SDK avoids re-initialization per request. Zod at boundary ensures runtime type safety. Optimistic UI + skeleton delays make perceived latency acceptable.
 
 ### Critical Pitfalls
 
-1. **DirectLine secret in the browser** — Any `VITE_COPILOT_*` env var or direct browser call to `directline.botframework.com` exposes credentials permanently. All SDK calls must live in `server/`; verify with `grep -r "COPILOT" client/` returning nothing.
+1. **DirectLine secret exposed in browser** — Prevention: All SDK calls server-side only. CI scan for `COPILOT_*` vars in client/. Verify no unauthenticated API calls from browser to Copilot Studio. Address in Phase 1 (server scaffold). If exposed: rotate secrets immediately in Copilot Studio Web Channel Security.
 
-2. **`dangerouslySetInnerHTML` mounting of Adaptive Cards** — Produces cards that look correct but all action buttons are dead (event listeners destroyed). Use the custom `useRef`/`useEffect` wrapper that calls `card.render()` and `appendChild()` on the ref; verify the first prototype card fires a network request on Submit click before writing any card templates.
+2. **Card actions destroyed via dangerouslySetInnerHTML** — Prevention: Use `adaptivecards-react` (or documented custom wrapper) with proper event delegation. Never call `.render()` and inject outerHTML. Address in Phase 2 (card renderer). Verification: click test on first prototype card; confirm Submit button fires network request.
 
-3. **Card not disabled after submit** — Card remains interactive during the 2-3 second inflight request; rapid double-click sends duplicate actions to Copilot Studio, triggering duplicate side effects downstream. Mark `pendingCardIds` immediately on `onExecuteAction` callback; server should also implement idempotency for `(conversationId, actionId)` pairs.
+3. **Card double-submission without pending state** — Prevention: After Action.Submit fires, set React state to "submitted" and disable card inputs. Show loading indicator. Server-side idempotency cache recent (conversationId, actionId) pairs. Address in Phase 2 (card UI + API). Verification: double-click Submit, confirm only one network request.
 
-4. **Card action allowlist missing or client-only** — Client-side Adaptive Cards `isRequired`/`regex` validation is entirely bypassable with a crafted POST. The server `/api/chat/card-action` handler must parse with Zod and check an explicit allowlist before forwarding anything to Copilot Studio.
+4. **Redis silent fallback masking failures** — Prevention (v1.4): Return 503 Service Unavailable when Redis down, not 200 with stale in-memory data. Implement health check that fails when Redis unavailable. Log every connection error. Never silently retry. Address in Phase 1 (store factory). Impact: prevents data loss and divergence in multi-instance deployments.
 
-5. **Fail-open auth stubs** — A stub that returns `const token = req.headers.authorization; // TODO validate` and continues makes the entire API unauthenticated. Stubs must reject with 401 when no `Authorization` header is present; bypass only via explicit `AUTH_REQUIRED=false` env var with a `NODE_ENV !== 'production'` guard.
+5. **Azure Redis TLS misconfiguration** — Prevention (v1.4): Use `rediss://` protocol + port 6380 (not redis:// + 6379). ioredis auto-detects TLS from rediss:// scheme. Add startup validation that rejects azure URLs without rediss://. Test against real Azure Cache. Address in Phase 1 (store factory). Symptoms: connection hangs, "Protocol error: expected '$', got 'H'" (wrong port), intermittent WRONGTYPE errors.
 
-6. **Adaptive Card schema version mismatch** — If the renderer's `maxVersion` is set lower than the card's `$schema` version, elements are silently dropped — no error, just blank space or `fallbackText`. Configure `maxVersion` and `onParseError` explicitly; verify with a Table element (AC 1.5 only) before writing any card templates.
+6. **Zod dual-instance from workspace hoisting** — Prevention: Zod declared in shared/ only. CI check: `npm ls zod` must show exactly one version at one path. Add instanceof fallback: check `error.issues` existence instead of instanceof ZodError. Address in Phase 1 (monorepo setup). Verification: run `npm ls zod` immediately after workspace setup.
 
-7. **Zod dual-instance from workspace hoisting** — If `zod` is declared as a direct dep in both `shared/` and `server/`, npm may install two copies, breaking `instanceof ZodError` in catch blocks. Declare Zod in `shared/` only; verify with `npm ls zod` returning exactly one path.
+7. **Serializing opaque sdkConversationRef to Redis** — Prevention (v1.4): Never serialize sdkConversationRef directly (JSON.stringify strips functions and prototypes; deserialized object fails SDK type checks). Store only conversationId string. Reconstruct ref by calling Copilot SDK if needed. Address in Phase 1 (serialization layer). Test: store ref, deserialize, pass to sendMessage() — must not produce "Invalid reference" error.
+
+8. **Date serialization becomes ISO string, not Date object** — Prevention (v1.4): Run all deserialized Redis values through Zod schemas. Use `.pipe(z.coerce.date())` to convert ISO strings back to Date. OR store timestamps as Unix milliseconds (number, never ambiguous). Address in Phase 1 (serialization layer). Verification: store date, retrieve, verify `timestamp instanceof Date` or `typeof timestamp === 'number'`.
+
+---
 
 ## Implications for Roadmap
 
-The architecture research prescribes a clear build order: everything depends on `shared/` schemas, server auth middleware must gate routes before any route is tested end-to-end, the normalizer must be isolated and unit-testable before route handlers are written, and Adaptive Card rendering is a standalone vertical that builds on a working text transcript. The pitfalls research reinforces this order — the security and correctness pitfalls all cluster in Phase 1 (scaffold) and Phase 2 (Adaptive Cards + card actions).
+Research suggests a **4-phase structure** that respects both architectural dependencies and feature priority:
 
-### Phase 1: Monorepo Scaffold + Server Foundation
+### Phase 1: Foundation — Server Scaffold & Store Abstraction
+**Rationale:** Everything downstream depends on server-side SDK integration and conversation persistence. Must establish auth middleware (fail-closed, not open), store interface (allows v1→v1.4 swap), and health check. Locks in DirectLine secret isolation. Prevents most critical pitfalls (1, 4, 5, 6, 7, 8).
 
-**Rationale:** Everything else imports from `shared/` and routes through the Express middleware stack. Foundational decisions made here (Zod instance location, auth middleware contract, conversation store interface, CORS config) are expensive to retrofit later. All critical security pitfalls are addressed in this phase.
+**Delivers:**
+- Express app with CORS + helmet + auth middleware (MSAL token stubs for v1)
+- ConversationStore interface + InMemoryStore implementation
+- Store factory (`createStore()`) that selects Redis or InMemory based on env
+- Copilot SDK singleton + activity normalizer
+- /health endpoint (reports auth requirement, v1.4: Redis connectivity)
+- Config vars (COPILOT_CLIENT_ID, AUTH_REQUIRED, REDIS_URL for v1.4, REDIS_TTL_DAYS)
+- .env.example with credential placeholders
 
-**Delivers:** Working monorepo; shared Zod schemas; Express server with auth middleware (fail-closed stub); `/api/chat/start` returning a `conversationId`; CORS configured from env var; `npm ls zod` returns one instance; `grep -r "COPILOT" client/` returns nothing.
+**Addresses features:**
+- Conversation start (foundation for all others)
+- Error handling infrastructure
 
-**Features addressed:** Normalized Zod message schema; MSAL OBO stub; Conversation start; Card action allowlist scaffolded.
+**Avoids pitfalls:**
+- DirectLine secret exposure (server-only calls)
+- Process memory conversation loss (interface from day one)
+- MSAL token fail-open (explicit AUTH_REQUIRED guard)
+- Zod dual-instance (single source in shared/)
+- Redis silent fallback (health check + 503 on unavailable)
+- Azure Redis TLS (createStore factory validates rediss:// + port 6380)
+- Serialization bugs (schema layer ready)
 
-**Pitfalls avoided:** DirectLine secret exposure; fail-open auth stubs; Zod dual-instance; `agentIdentifier` deprecation; CORS production gap (stub CI check); conversation state store interface (in-memory Map with abstraction layer).
+**Research flags:**
+- Copilot SDK token refresh timing (30-minute expiry — must refresh before each send or on timer)
+- MSAL OBO flow details (v1 stub; v1.2+ real implementation needs tenant authority URL)
 
-**Research flag:** Standard patterns — Vite/Express monorepo setup is well-documented; npm workspaces + Zod is established.
+**Standard patterns:**
+- Express middleware setup (well-documented)
+- npm workspaces monorepo structure (established, no research needed)
 
-### Phase 2: Text Chat End-to-End
+---
 
-**Rationale:** Get a working chat loop (text in, text response out, displayed in transcript) before adding Adaptive Cards complexity. This validates the full proxy chain — client → Express → `CopilotStudioClient` → Copilot Studio → normalizer → Zustand store → React — with the simplest possible payload. Text messages expose the streaming activity consumption pattern and the normalizer without card-specific edge cases.
+### Phase 2: Client UI — Chat Transcript & Adaptive Card Rendering
+**Rationale:** Once server is running, build the UI. Depends on /health and /api/chat/start|send endpoints from Phase 1. Locking in card rendering prevents pitfall #2 early (dangerouslySetInnerHTML). Must include disabled+pending state per Copilot Studio docs (pitfall #3).
 
-**Delivers:** Working text chat end-to-end; `ChatTranscript` + `MessageBubble` rendering normalized text messages; optimistic user bubble; loading skeleton; typing indicator; error toast with inline error state; `/api/chat/send` route complete; `activityNormalizer.ts` unit-tested.
+**Delivers:**
+- React component: ChatTranscript (message bubbles, user/bot distinction, avatars)
+- useChatApi hook (useReducer state machine, optimistic user message, 3-attempt retry with exponential backoff, abort signal cleanup)
+- AdaptiveCardRenderer component (useRef+useEffect pattern, event delegation working)
+- Send box with text input (Enter to send, Shift+Enter for newline)
+- Loading skeleton (300ms delay to avoid flicker on fast responses)
+- Typing indicator (animated)
+- Error toast + inline bubble error state with retry affordance
+- Dark/light mode toggle + prefers-color-scheme default (CSS custom properties)
+- Reduced-motion respect (skeleton/typing indicator animations suppressed)
 
-**Features addressed:** Message bubble transcript; optimistic user bubble; typing indicator; loading skeleton; error toast; `/api/chat/send`.
+**Addresses features (P1 table stakes):**
+- Message bubble transcript
+- Optimistic user message display + loading skeleton
+- Typing indicator
+- Error toasts
+- Adaptive Card rendering
+- Card disabled+pending state after submit
+- Hybrid turn rendering (text + card in same message)
+- Dark/light mode
+- Reduced-motion
+- Keyboard navigation (focus management in send box, tab through cards)
+- ARIA live regions (transcript container as polite region, announcements for new messages)
 
-**Pitfalls avoided:** Forwarding raw Activity to browser (normalizer enforced before this phase ends); polling anti-pattern (streaming async iterator established here).
+**Implements architecture:**
+- useChatApi state machine (useReducer) — central state, all async logic
+- Component tree (ChatTranscript, AdaptiveCardRenderer, SendBox)
 
-**Research flag:** Standard patterns — React state management, fetch with optimistic updates, and Express route handlers are well-documented.
+**Avoids pitfalls:**
+- dangerouslySetInnerHTML destroying card events (use proper wrapper)
+- Card double-submit (pending state + disable inputs)
+- Responsive mobile layout (Tailwind breakpoints sm/md/lg map to 360px–1280px)
 
-### Phase 3: Adaptive Cards Rendering + Card Actions
+**Research flags:**
+- Adaptive Cards schema version compatibility (1.5 vs 1.3, renderer maxVersion configuration)
+- React 18 vs React 19 useOptimistic hook (v1 uses React 18 per PROJECT.md; useOptimistic is React 19 feature, use local state pattern instead)
 
-**Rationale:** Adaptive Cards are the core differentiator and the highest-risk rendering layer. Isolate this work from the text chat foundation so failures are contained. The `dangerouslySetInnerHTML` pitfall, schema version mismatch, duplicate submission, and card allowlist pitfalls all manifest here — address each with an explicit verification test before moving on.
+**Standard patterns:**
+- React hooks (well-documented)
+- Tailwind responsive design (established)
+- Zod runtime validation (used in Phase 1, reuse here)
 
-**Delivers:** `CardRenderer.tsx` (custom `useRef`/`useEffect` wrapper); card rendered inline in transcript; `onExecuteAction` → `chatStore.submitCardAction`; card immediately disabled + pending spinner on submit; card permanently disabled after response; `/api/chat/card-action` route with Zod parse + `ACTION_ALLOWLIST` check + `Action.OpenUrl` domain allowlist; `pendingCardIds`/`completedCardIds` in Zustand store; hybrid turn rendering (text + card in one activity); schema `maxVersion` and `onParseError` configured.
+---
 
-**Features addressed:** Adaptive Card rendering; card disabled/pending state; hybrid turn rendering; card action allowlist (client + server); duplicate submission prevention.
+### Phase 3: Enhanced Features — Card Actions, Metadata Sidebar, Audit Trail
+**Rationale:** Layers on top of Phase 2. Requires stable card rendering (Phase 2) and server-side card validation (new Phase 3 work). Adds security layer (allowlist) and audit/debugging capability. Split-pane layout is a differentiator vs. Copilot Studio default canvas.
 
-**Pitfalls avoided:** `dangerouslySetInnerHTML` (explicitly forbidden; test: Submit fires network request); schema version mismatch (test: Table element renders correctly); card not disabled after submit (test: double-click produces one request); allowlist missing (test: crafted POST with unlisted action type returns 403).
+**Delivers:**
+- /api/chat/card-action endpoint (server-side Zod validation, card action allowlist enforcement, domain allowlist for Action.OpenUrl)
+- Card action allowlist (shared/ schema, server middleware)
+- Client-side action validation before submission (defense-in-depth, not sole protection)
+- Timeline sidebar (desktop only, ≥768px breakpoint) — lists submitted cards with timestamp, action type, value summary
+- Activity log download (JSON serialization of normalized message array)
+- Split-pane layout (desktop: transcript left, metadata drawer right; mobile: single column)
+- Reduced-motion + accessibility polish (keyboard trap in drawer, focus management)
 
-**Research flag:** Needs care — Adaptive Cards React integration is the most underdocumented area; the `adaptivecards-react` abandonment means community examples are outdated. The custom wrapper pattern is verified against the official JS SDK docs and GitHub issue threads, but implementation details should be verified against `adaptivecards` v3 API at implementation time.
+**Addresses features (competitive differentiators):**
+- Split-pane desktop layout + metadata drawer
+- Timeline sidebar (audit trail of structured interactions)
+- Activity log download (enterprise auditability)
+- Card action allowlist (security)
 
-### Phase 4: Accessibility, Theming, and Responsive Layout
+**Implements architecture:**
+- Card action routing (client → server validation → Copilot SDK)
+- Secondary indexing prep (v1 not needed; v1.4 uses sorted sets for user-scoped queries)
 
-**Rationale:** Accessibility and theming are cross-cutting concerns that touch every component. Doing them after the core rendering is complete allows systematic application across the full component tree rather than retrofitting piecemeal. WCAG 2.2 Level AA is a hard legal requirement (EAA in force June 2025) — this is not optional polish.
+**Avoids pitfalls:**
+- Card action allowlist missing or bypassable (server-side Zod validation, explicit action type allowlist)
+- Phishing via Action.OpenUrl (domain allowlist)
 
-**Delivers:** ARIA live region on `ChatTranscript` (`aria-live="polite"`); new bot messages and card submit confirmations announced; error toasts announced; full keyboard navigation with correct focus management on send box and card action buttons; dark/light mode toggle with `prefers-color-scheme` default and localStorage persistence; CSS custom properties for all color tokens; `prefers-reduced-motion` suppressing typing indicator animation and skeleton shimmer; responsive layout from 360px to 1280px+; avatar/sender identity; timestamps.
+**Research flags:**
+- Card action payload schema (Copilot SDK Activity.channelData structure, what fields can be submitted)
+- Timeline sidebar UI patterns (no reference in Copilot Studio; invent a clean design)
 
-**Features addressed:** ARIA live regions; keyboard navigation; dark/light mode; reduced-motion; responsive layout; avatar; timestamps.
+**Standard patterns:**
+- React drawer/modal patterns (well-documented)
+- JSON serialization (built-in)
+- Zod array schemas (established)
 
-**Pitfalls avoided:** Reduced-motion not respected; no ARIA live regions; keyboard trap in send box.
+---
 
-**Research flag:** Standard patterns — WCAG 2.2 and Tailwind responsive utilities are well-documented. CSS custom properties + Adaptive Cards host theme injection is slightly custom but low risk.
+### Phase 4: v1.4 Redis Persistence (Optional Concurrent or Sequential)
+**Rationale:** *Can run concurrently with Phases 2–3 or sequentially after Phase 3.* Enabled by Phase 1 ConversationStore abstraction. Adds multi-instance scaling, horizontal deployment support, and v1.5 workflow prep. Drop-in factory-pattern swap: no route changes, ConversationStore interface unchanged.
 
-### Phase 5: Activity Log, Metadata Drawer, and v1 Polish
+**Delivers:**
+- RedisStore implementation (ioredis client, JSON serialization, sorted set indexes)
+- Store factory selection (REDIS_URL env var: set → RedisStore, unset → InMemoryStore)
+- Expanded StoredConversation schema (userId, tenantId, createdAt, updatedAt, status)
+- Chat route updates (populate new fields from req.user JWT claims)
+- Health check enhancement (Redis ping, returns 503 if unavailable)
+- ioredis-mock setup (unit testing without external Redis)
+- Integration tests (real Azure Cache, or skip if REDIS_URL not set)
+- Config vars (REDIS_TIMEOUT_MS, REDIS_TTL_DAYS)
+- Migration helper (if needed, cleanse old in-memory data)
 
-**Rationale:** The metadata drawer and activity log are downstream of stable card action tracking (established in Phase 3) and the normalized message schema. These features are now low-risk additions that read from existing store state without new API surface.
+**Addresses features:**
+- Conversation persistence across process restarts (implicit, not user-visible)
+- Foundation for v1.5 "list user's conversations" feature (sorted set indexes)
 
-**Delivers:** `MetadataDrawer.tsx` desktop sidebar with card action timeline; `ActivityLog` download button (JSON serialization of `messages[]`); v1 polish (error message specificity per error type; `fallbackText` detection with contextual error display; `React.memo` on `MessageBubble`/`CardRenderer` to prevent full-list re-renders; lazy-import of `adaptivecards` bundle via `React.lazy` + `Suspense`).
+**Avoids pitfalls (critical for v1.4):**
+- Silent fallback masking failures (return 503, never degrade)
+- Serializing sdkConversationRef (store conversationId only)
+- Date serialization bugs (Zod coercion at deserialization)
+- TTL edge cases (GETEX atomic get+extend, expiresAt check in document)
+- Connection pool exhaustion (configure poolSize = expected_concurrency * 1.5)
+- Dual-write consistency (factory pattern: one store, never both)
 
-**Features addressed:** Timeline sidebar; activity log download; performance optimization; error message specificity.
+**Research flags:**
+- Azure Cache for Redis capacity planning (1GB, 10GB, cluster options)
+- ioredis pool tuning for expected load (concurrency estimation)
+- TTL jitter strategy (avoid thundering herd)
 
-**Pitfalls avoided:** Full card list re-render on every message; loading full AC bundle unconditionally; generic error messages.
+**Standard patterns:**
+- ioredis usage (well-documented, Alibaba-sponsored)
+- Redis sorted sets (O(log N) queries)
+- JSON serialization (built-in)
 
-**Research flag:** Standard patterns — Zustand selectors, React.memo, and React.lazy are well-documented.
+---
 
-### Phase 6: CI, Documentation, and v1 Hardening
+### Phase 5: v1.5 Workflow Orchestrator (Future)
+**Rationale:** Depends on v1.4 Redis persistence. Adds structured conversation workflows (e.g., "approval chain", "data extraction pipeline"). Requires workflowId/workflowStep fields already prepared in v1.4 StoredConversation schema.
 
-**Rationale:** CI and documentation belong last so they reflect the final v1 architecture rather than earlier scaffolding. The production CORS check must run in CI against the built client. The Adaptive Cards playbook is written once the card patterns are stable.
+**Roadmap note:** Not in scope for v1/v1.4. Mentioned for schema planning only.
 
-**Delivers:** GitHub Actions CI (lint + test both workspaces); production build smoke test (built client served via `express.static`, API called without Vite proxy, CORS headers verified); `npm ls zod` check in CI; `grep -r "COPILOT" client/` check in CI; `.env.example` with all required and optional vars documented; README with setup and dev instructions; Adaptive Cards Playbook (schema validation, allowlist registration, test patterns for future card authors).
+---
 
-**Features addressed:** Adaptive Cards playbook documentation; CI automation; production hardening.
+## Phase Ordering Rationale
 
-**Pitfalls avoided:** Vite proxy CORS gap (production build test in CI); credential leak check automated; Zod dual-instance check automated.
+1. **Phase 1 first (Foundation):** All other phases depend on working server, auth, and ConversationStore abstraction. Locking in the interface allows v1.4 Redis to be a drop-in swap without touching route logic.
 
-**Research flag:** Standard patterns — GitHub Actions, ESLint flat config, and Vitest workspace mode are well-documented.
+2. **Phase 2 follows Phase 1 (UI):** Cannot render messages until server is running and /api endpoints respond. Card rendering must land early to catch pitfall #2 (dangerouslySetInnerHTML).
 
-### Phase Ordering Rationale
+3. **Phase 3 parallel or after Phase 2 (Enhanced):** Depends on card rendering (Phase 2) and server endpoint work (Phase 1). Can start before Phase 2 ships if /api/chat/card-action is stubbed early.
 
-- Phases 1 → 2 → 3 follow the dependency chain from ARCHITECTURE.md's build order table: schemas first, auth + routes second, normalizer third, client store fourth, text transcript fifth, card rendering sixth.
-- Security pitfalls (credential exposure, fail-open auth, action allowlist) are all addressed in Phases 1 and 3 — before any code touches real Copilot Studio or real card submissions.
-- Accessibility is a separate phase (4) rather than inline in each component because the ARIA live region, keyboard focus management, and CSS token decisions interact across the full component tree; applying them systematically to the complete tree is more reliable than retrofitting.
-- The metadata drawer and activity log (Phase 5) are explicitly downstream of card action tracking (Phase 3) — the feature dependency graph from FEATURES.md confirms this.
-- CI and docs (Phase 6) are last because the production CORS check and the Adaptive Cards Playbook can only be written accurately once the implementation is stable.
+4. **Phase 4 optional during or after Phase 3 (v1.4 Redis):** Drop-in replacement via factory pattern. Can be introduced mid-development (hot-swap test: start with InMemory, switch to Redis, verify no route changes needed). Recommended to land before production deployment to achieve horizontal scaling.
 
-### Research Flags
+5. **Phase 5 deferred (v1.5 Workflow):** Schema prepared in v1.4, feature implementation deferred to v1.5 roadmap.
 
-Phases likely needing deeper research during planning:
-- **Phase 3 (Adaptive Cards):** The `adaptivecards` v3 `render()` API, `HostConfig` schema, and `onExecuteAction` callback signature should be verified against the current npm package at implementation time. Community examples predate v3 and reference the abandoned React wrapper. The `adaptivecards-templating` v2 data-binding API should also be checked if Copilot Studio returns template + data separately.
-- **Phase 1 (MSAL OBO stub):** The specific `CopilotStudioConnectionSettings` fields (`schemaName`, `environmentId`, `tenantId` vs `directConnectUrl`) should be verified against the actual Copilot Studio environment configuration before implementation. The `directConnectUrl` vs named-settings branching is a gotcha documented in PITFALLS.md.
+**Why this structure avoids pitfalls:**
 
-Phases with standard patterns (skip research-phase):
-- **Phase 2 (text chat):** React state management, fetch patterns, Express route handlers, and Zustand are extremely well-documented.
-- **Phase 4 (accessibility/theming):** WCAG 2.2 techniques, Tailwind responsive utilities, and CSS custom properties are stable, well-documented standards.
-- **Phase 5 (metadata drawer / activity log):** Pure React + Zustand selector work; no new integrations.
-- **Phase 6 (CI/docs):** GitHub Actions, ESLint flat config, and npm workspace CI patterns are standard.
+- Pitfall #1 (DirectLine exposed): Phase 1 locks in server-only SDK calls + CI credential scan
+- Pitfall #2 (card events destroyed): Phase 2 implements proper card renderer
+- Pitfall #3 (double-submit): Phase 2 includes disabled+pending state
+- Pitfall #4 (Redis fallback): Phase 1 establishes health check; Phase 4 enforces 503, never silent fallback
+- Pitfall #5 (Azure TLS): Phase 1 store factory validates rediss:// + port 6380
+- Pitfall #6 (Zod dual-instance): Phase 1 monorepo setup + CI check
+- Pitfall #7 (sdkConversationRef serialization): Phase 4 schema validation prevents this
+- Pitfall #8 (date serialization): Phase 1 Zod setup; Phase 4 coercion on deserialize
+
+---
+
+## Research Flags
+
+### Phases Needing Deeper Research During Planning
+
+**Phase 1 (Foundation):**
+- Copilot Studio SDK token acquisition & refresh flow (v1 uses placeholder stubs; v1.2+ needs real MSAL OBO implementation)
+- MSAL OBO flow details: authority URL target (specific tenant, not /common), token type validation (access token, not ID token)
+- DirectLine token lifecycle (30-minute expiry, refresh mechanism, server-side caching strategy)
+
+**Phase 2 (Client UI):**
+- Adaptive Cards schema version compatibility with Copilot Studio responses (maxVersion configuration, parse error handling)
+- React 18 optimistic UI patterns (v1 uses local state + reducer, not React 19 useOptimistic)
+- Keyboard focus management in card actions (Tab order through dynamic content)
+
+**Phase 3 (Enhanced):**
+- Card action payload schema (Copilot SDK Activity.channelData structure — what fields are mutable vs. read-only?)
+- Timeline sidebar UI patterns (no reference implementation; design needed)
+
+**Phase 4 (v1.4 Redis):**
+- Azure Cache for Redis capacity planning (SKU selection: Basic 1GB, Standard 10GB, Premium with clustering)
+- ioredis pool size tuning for expected load (concurrency = concurrent users * request rate)
+- Conversation TTL strategy (30 days hardcoded vs. configurable per tenant)
+
+### Phases with Standard Patterns (Skip Detailed Research)
+
+**Phase 1:** Express middleware setup, npm workspaces monorepo structure, Zod schema definitions, TypeScript config — all have abundant documentation and established patterns.
+
+**Phase 2:** React hooks (useState, useReducer, useEffect), Tailwind CSS responsive design, CSS custom properties for theming — well-documented, no research needed.
+
+**Phase 3:** React component composition, JSON serialization, Zod array validation — standard patterns.
+
+**Phase 4:** ioredis documentation is comprehensive; no novel research needed. Focus on testing against real Azure Cache, which is better done in implementation than research phase.
+
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Core stack (React 18, Vite 6, Express 5, TypeScript 5.8, Tailwind v4, Zod v4) verified against official release notes and npm registry. `@microsoft/agents-copilotstudio-client` v1.2.3 GA status verified against official Microsoft Learn docs and npm. The Adaptive Cards React wrapper abandonment verified against official maintainer statement in GitHub Discussions. |
-| Features | MEDIUM-HIGH | Table-stakes feature set consistent across official Copilot Studio docs, BotFramework-WebChat issues, and WCAG standards. Differentiator features (timeline sidebar, activity log) are low-complexity additions with no external dependencies. Anti-feature decisions (streaming, multi-session) are well-justified by SDK limitations. |
-| Architecture | HIGH | Proxy pattern, Zod shared contract, allowlist enforcement, and streaming activity consumption all verified against official Microsoft SDK samples and Microsoft Learn docs. Build order derived from explicit component dependency graph — low risk of being wrong. |
-| Pitfalls | MEDIUM-HIGH | Security pitfalls (credential exposure, fail-open auth, action allowlist) verified against the Microsoft Security Blog and official docs. Adaptive Cards pitfalls (`dangerouslySetInnerHTML`, schema version) verified against official GitHub issues with maintainer responses. Zod dual-instance verified against official Zod GitHub issues. Token refresh timing (1800s expiry) is SDK-internal and marked MEDIUM. |
+| **Stack** | HIGH | All recommendations sourced from official Microsoft Learn, npm registry, actively maintained projects (ioredis, Vite, React, Express 5 GA). No experimental dependencies. |
+| **Features** | HIGH | Table stakes verified against Microsoft Copilot Studio docs + WCAG 2.2 standards. Differentiators (timeline sidebar, metadata drawer) aligned with PROJECT.md vision. Defer list justified by complexity/demand tradeoff. |
+| **Architecture** | HIGH | ConversationStore interface pattern standard (Factory Method, established in TypeScript/Node.js). Redis sorted set indexing (O(log N) lookups) documented. Copilot SDK singleton pattern per Microsoft samples. |
+| **Pitfalls** | MEDIUM-HIGH | Core pitfalls (#1–6) sourced from official Microsoft security blog + GitHub issue discussions with maintainers. Redis pitfalls (#11–17) from recent Oneuptime blog (2026) + ioredis docs. Some pitfalls inferred from common patterns (e.g., #3 card double-submit from React async patterns), confidence medium. |
+| **v1.4 Redis** | HIGH | ioredis package actively maintained, TLS configuration well-documented (Azure Cache requires rediss:// + 6380). ioredis-mock matches ioredis API, no surprises. |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** HIGH for Phase 1–3; HIGH for Phase 4 (if research flags are addressed during planning).
 
 ### Gaps to Address
 
-- **DirectLine token refresh implementation:** The 30-minute token expiry is documented but the exact API for refresh (whether `CopilotStudioClient` handles it internally or requires an explicit refresh call) was not verified in the GA v1.2.3 SDK. Verify at Phase 1 implementation time by checking the `CopilotStudioClient` API reference for a refresh method.
-- **MSAL OBO scope for Copilot Studio:** The exact OAuth scope string required for `acquireTokenOnBehalfOf` targeting Copilot Studio (`CopilotStudio.Copilots.Invoke` referenced in ARCHITECTURE.md) should be verified against the current Microsoft Entra app registration requirements before implementing even the stub — the wrong scope produces cryptic 400 errors.
-- **`adaptivecards-react` peer dep (`swiper`):** PITFALLS.md notes that `adaptivecards-react` has an undeclared `swiper` peer dependency. Since the project is using the custom `useRef`/`useEffect` wrapper (not `adaptivecards-react`), this is not relevant — but if any future dependency re-introduces `adaptivecards-react`, this will cause build failures.
-- **Copilot Studio Web Channel "Require secured access" propagation window:** The 2-hour propagation delay for security setting changes means CI environment setup must account for this. Plan the Copilot Studio environment configuration well before Phase 1 integration testing begins.
+1. **Copilot SDK token refresh timing:** v1 uses placeholder; v1.2+ needs real implementation. Placeholder must log `[AUTH STUB] Token refresh skipped` on every request to avoid silent unauthenticated API. **Mitigation:** Phase 1 planning must validate MSAL OBO docs; consider reaching out to Microsoft for clarification on token cache strategy.
+
+2. **Adaptive Cards schema version mismatch:** Research shows Copilot Studio may return cards with different schema versions than renderer is configured for. **Mitigation:** Phase 2 planning must test with live Copilot Studio agent, verify renderer maxVersion matches.
+
+3. **Card action allowlist registration:** Which action types and fields are security-critical? Phase 3 planning must define allowlist explicitly (e.g., only allow Action.Submit with known `verb` values, only allow Action.OpenUrl with domain in allowlist). **Mitigation:** Collaborative session with Copilot Studio expert to catalog card types in use.
+
+4. **v1.4 capacity planning:** How many conversations per user? What TTL is appropriate? Phase 4 planning must estimate load (concurrent users, message frequency) to size Redis instance (1GB, 10GB, cluster). **Mitigation:** Load testing in Phase 4 planning; start with 1GB (standard tier), monitor, upgrade if needed.
+
+5. **Testing against real Azure Cache:** Unit tests use ioredis-mock (in-memory, no TLS). Phase 4 planning must include integration test against real Azure Cache to validate TLS + port 6380 configuration. **Mitigation:** CI/CD step that runs optional integration tests if REDIS_URL is set (skip if not).
+
+---
 
 ## Sources
 
-### Primary (HIGH confidence)
-- Microsoft Learn — CopilotStudioClient API Reference (updated 2025-12-18): https://learn.microsoft.com/en-us/javascript/api/@microsoft/agents-copilotstudio-client/copilotstudioclient
-- Microsoft Learn — Integrate with web/native apps using M365 Agents SDK (updated 2025-12-12): https://learn.microsoft.com/en-us/microsoft-copilot-studio/publication-integrate-web-or-native-app-m365-agents-sdk
-- microsoft/Agents GitHub — official Node.js samples (copilotstudio-webchat-react, copilotstudio-client): https://github.com/microsoft/Agents/tree/main/samples/nodejs
-- npm `@microsoft/agents-copilotstudio-client` v1.2.3 (GA Sep 2025): https://www.npmjs.com/package/@microsoft/agents-copilotstudio-client
-- GitHub Discussion — adaptivecards-react React 18 no-support statement (Sep 2023): https://github.com/microsoft/AdaptiveCards/discussions/8671
-- BotFramework-WebChat Issue #1427 — card disable after submit: https://github.com/Microsoft/BotFramework-WebChat/issues/1427
-- Microsoft Security Blog — Top 10 actions to build agents securely with Copilot Studio (Feb 2026): https://www.microsoft.com/en-us/security/blog/2026/02/12/copilot-studio-agent-security-top-10-risks-detect-prevent/
-- GitHub — adaptivecards Actions not working with React (issue #6192): https://github.com/microsoft/AdaptiveCards/issues/6192
-- Express 5.2.1 stable release: https://expressjs.com/2025/03/31/v5-1-latest-release.html
-- Zod v4 stable release notes: https://zod.dev/v4
-- WCAG 2.2 (European Accessibility Act, in force June 28, 2025): https://www.w3.org/WAI/standards-guidelines/wcag/new-in-21/
-- Adaptive Cards JavaScript SDK — Microsoft Learn (updated 2025-07-03): https://learn.microsoft.com/en-us/adaptive-cards/sdk/rendering-cards/javascript/getting-started
+### Primary Sources (HIGH Confidence)
 
-### Secondary (MEDIUM confidence)
-- Microsoft Agents-for-js API docs v1.3.0-beta: https://microsoft.github.io/Agents-for-js/ — SDK internals; docs lag GA release
-- Ragnar Heil — "The Good, The Bad, and The Ugly of Copilot Studio" (2025): https://ragnarheil.de/the-good-the-bad-and-the-ugly-of-copilot-studio — community practitioner review
-- GitHub colinhacks/zod Issue #2617 — Zod monorepo dual-instance: https://github.com/colinhacks/zod/issues/2617
-- GitHub adaptivecards-react swiper peer dep issue #8505: https://github.com/microsoft/AdaptiveCards/issues/8505
-- GitHub AzureAD/microsoft-authentication-library-for-js issue #5330 — OBO refresh tokens: https://github.com/AzureAD/microsoft-authentication-library-for-js/issues/5330
+**Stack Research:**
+- Microsoft Learn — CopilotStudioClient API Reference (updated 2025-12-18): Official SDK documentation, API signatures
+- Microsoft Learn — Integrate with web/native apps using M365 Agents SDK (updated 2025-12-12): Architecture patterns, recommended practices
+- npm `@microsoft/agents-copilotstudio-client` (v1.2.3 GA Sep 2025): Official package, versioning strategy
+- npm `ioredis` (v5.9.3 Feb 2026): Actively maintained, TLS + Azure Cache documentation
+- Express.js (v5.2.1 stable 2025): Framework stability, TypeScript support
+- Vite 6 release blog (Nov 2024): Build tooling stability
+- Zod v3 documentation: Runtime validation patterns
+
+**Features Research:**
+- Microsoft Copilot Studio — Adaptive Cards overview (official docs, 2025-12-22): Card capabilities
+- Microsoft Copilot Studio — Customize default canvas (official docs, 2025-12-19): UI patterns
+- Microsoft Teams — Designing Adaptive Cards (official docs, 2025-04-04): Card design best practices
+- WCAG 2.2 compliance (W3C, 2024): Accessibility standards, EAA requirements (EU, June 2025)
+- BotFramework-WebChat GitHub issue #1427: Card disabled-after-submit pattern
+
+**Architecture Research:**
+- Express.js Tutorial — Practical, Scalable Patterns (2026): Pattern recommendations
+- Redis Secondary Indexing Patterns (official redis.io docs): Sorted set query patterns
+- Factory Method Pattern in TypeScript (Medium, 2025): Design pattern documentation
+- ioredis GitHub Repository: Connection pooling, TLS configuration, Azure integration
+
+**Pitfalls Research:**
+- Microsoft Security Blog — Top 10 actions to build agents securely with Copilot Studio (Feb 2026): Official security guidance
+- Microsoft Learn — Configure web and Direct Line channel security: Token lifecycle, credential management
+- GitHub microsoft/AdaptiveCards issues (#6192, #8678, #8505): Card rendering pitfalls
+- GitHub AzureAD/microsoft-authentication-library-for-js: MSAL OBO flow gotchas
+- GitHub redis/ioredis: Connection handling, TLS + Azure configuration
+- Oneuptime blog (2026-02-02, 2026-01-25, 2026-02-25): Redis best practices, caching patterns
+
+### Secondary Sources (MEDIUM Confidence)
+
+- WebSearch consensus on React 18 vs React 19 ecosystem readiness
+- npm registry package update histories and community discussions
+- Community blog posts on Copilot Studio integration patterns (corroborated with official docs)
+- GitHub discussions with maintainers on deprecated features (e.g., adaptivecards-react React 18 support)
+
+### Tertiary Sources (LOWER Confidence, Validation Needed)
+
+- Specific Copilot Studio agent configuration examples (vary by use case; validate during Phase 1 planning)
+- Load testing benchmarks for Azure Cache for Redis (highly dependent on SKU and workload; validate during Phase 4)
 
 ---
-*Research completed: 2026-02-19*
-*Ready for roadmap: yes*
+
+## Integration with Roadmap
+
+This summary informs the roadmap creation as follows:
+
+- **Phase sequence** (Phases 1–5 suggested above) becomes starting point for roadmap planning; roadmapper may adjust based on team capacity and stakeholder priorities.
+- **Research flags** identify which phases need deeper `/gsd:research-phase` calls during planning (Phases 1, 2, 3, 4 all have gaps to explore).
+- **Confidence assessment** calibrates risk: HIGH confidence areas (stack, core features, architecture) can proceed quickly to requirements; MEDIUM areas (pitfalls, v1.4 details) warrant explicit testing checkpoints.
+- **Pitfall-to-phase mapping** (from PITFALLS.md) ensures each phase's plan includes specific test cases to prevent known issues.
+
+---
+
+*Research completed: 2026-02-21*
+*Status: Ready for roadmap creation*
