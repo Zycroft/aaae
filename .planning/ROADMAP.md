@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1–3 (shipped 2026-02-20)
-- 📋 **v1.1 Polish** — Phase 4 (planned)
+- ✅ **v1.1 Polish** — Phase 4 (shipped 2026-02-20)
 
 ## Phases
 
@@ -18,7 +18,7 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 
 </details>
 
-### 📋 v1.1 Polish (Planned)
+### ✅ v1.1 Polish (Shipped 2026-02-20)
 
 ### Phase 4: Polish, Metadata Drawer, CI, and Docs
 

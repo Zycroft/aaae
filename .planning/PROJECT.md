@@ -4,7 +4,9 @@
 
 A production-ready monorepo (React + Node) that delivers a responsive chat experience powered by Microsoft Copilot Studio (Microsoft 365 Agents SDK) and Adaptive Cards. Users can have free-form text conversations and submit structured Adaptive Card forms, with all Copilot Studio calls proxied through the Node server so secrets never reach the browser.
 
-v1.0 (MVP) shipped 2026-02-20: full text chat and interactive Adaptive Cards working end-to-end, WCAG 2.2 AA accessible, dark/light theme, responsive from 360px through 1280px. CI, documentation, and timeline sidebar are v1.1 work.
+v1.0 (MVP) shipped 2026-02-20: full text chat and interactive Adaptive Cards working end-to-end, WCAG 2.2 AA accessible, dark/light theme, responsive from 360px through 1280px.
+
+v1.1 (Polish) shipped 2026-02-20: metadata sidebar with activity timeline and JSON download, GitHub Actions CI with credential-leak and Zod-instance checks, README quick start, and Adaptive Cards authoring playbook.
 
 ## Core Value
 
@@ -51,15 +53,16 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ prefers-reduced-motion: transitions/animations disabled when set — v1.0
 - ✓ ARIA live region on transcript (aria-live="polite") for screen readers — v1.0
 - ✓ All interactive elements keyboard-navigable with visible focus states — v1.0
+- ✓ GitHub Actions workflow: lint + tests on push/PR, credential-leak check (COPILOT_[A-Z_]*=), Zod-instance check — v1.1
+- ✓ Timeline sidebar (desktop): MetadataPane shows adaptiveCard messages in chronological order — v1.1
+- ✓ Activity log download: exports full conversation as dated JSON with exportedAt/messageCount — v1.1
+- ✓ README: monorepo quick start, full env var table (10 vars), project structure, security notes — v1.1
+- ✓ docs/adaptive-card-playbook.md: 4-step card registration guide, allowlist wiring, test pattern — v1.1
+- ✓ docs/cards/feedback-survey.json: sample Adaptive Card v1.5 with ChoiceSet and Action.Submit — v1.1
 
 ### Active
 
-- [ ] GitHub Actions workflow: lint + tests on push/PR, credential-leak check, Zod-instance check (INFRA-07)
-- [ ] Timeline sidebar (desktop): completed card actions in chronological order (UI-11)
-- [ ] Activity log download: export full conversation as JSON (UI-12)
-- [ ] README: monorepo setup, env vars, npm run dev, npm test (DOCS-01)
-- [ ] docs/adaptive-card-playbook.md: card registration pattern with cardId, inputs, userSummary formatter (DOCS-02)
-- [ ] Sample Adaptive Card JSON asset in docs/cards/ used in tests (DOCS-03)
+_(none — v1.1 milestone complete)_
 
 ### Out of Scope
 
@@ -75,6 +78,8 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - Quick-reply chips from suggestedActions — v2 (CARD-02)
 
 ## Context
+
+**Shipped v1.1 (2026-02-20):** 4 phases, 16 plans total — Phase 4 adds MetadataPane, GitHub Actions CI, README, and Adaptive Cards playbook
 
 **Shipped v1.0 (2026-02-20):** 3 phases, 13 plans, ~2,341 LOC TypeScript/JS, 91 files
 
@@ -92,10 +97,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - MSAL OBO stubs are fail-closed by design; `AUTH_REQUIRED=true` is the safe default
 - ESLint missing `@react-eslint` plugin for JSX type inference — non-blocking, no runtime impact (tech debt for v1.1)
 
-**Tech debt carried into v1.1:**
+**Tech debt carried into v2:**
 - Missing VERIFICATION.md for Phases 1 & 3 (all code verified functionally; documentation gap only)
-- Metadata drawer `aside.metadataPane` renders placeholder "Activity log (Phase 4)" text — UI-11/UI-12 are Phase 4
-- ESLint JSX plugin missing — non-blocking
+- ESLint JSX plugin missing — non-blocking, 3 pre-existing errors in AdaptiveCardMessage.tsx and ChatInput.tsx
 
 ## Constraints
 
@@ -114,6 +118,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | Custom adaptivecards v3 wrapper (not adaptivecards-react) | adaptivecards-react is React 18 incompatible | ✓ Good — custom useRef/useEffect wrapper worked cleanly |
 | MSAL OBO stubs fail-closed | Security baseline for v1; real OBO deferred to v2 | ✓ Good — AUTH_REQUIRED=true default enforced |
 | CSS custom properties for theming | Runtime theme switching without JS overhead | ✓ Good — dark/light toggle + localStorage persistence works |
+| COPILOT_[A-Z_]*= grep pattern for CI | Catches credential assignments without false-positiving on code identifiers | ✓ Good — correctly distinguishes COPILOT_TENANT_ID= from CopilotStudioClient |
+| npm ls zod --depth=Infinity | Enforces single Zod instance across full workspace tree, not just direct deps | ✓ Good — would catch hoisted duplicates that --depth=0 would miss |
+| MetadataPane as prop-receiving component | No new hook needed; ChatShell already owns message state | ✓ Good — clean composition, simple to test |
 
 ---
-*Last updated: 2026-02-20 after v1.0 milestone*
+*Last updated: 2026-02-20 after v1.1 milestone*
