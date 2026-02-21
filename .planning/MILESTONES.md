@@ -27,3 +27,19 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.1 Polish (Shipped: 2026-02-20)
+
+**Phases completed:** Phase 4 (1 phase, 3 plans, 5 tasks)
+**Timeline:** 2026-02-20 (1 day)
+**Requirements:** UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03 (6/6 complete)
+
+**Key accomplishments:**
+1. MetadataPane React component — activity timeline sidebar filtering adaptiveCard messages into numbered `<ol>`, plus dated JSON download button with memory-safe `URL.revokeObjectURL`
+2. GitHub Actions CI — two parallel jobs: `lint-test` (npm ci → lint → test) and `security-checks` (COPILOT credential leak grep + single Zod instance validation via `--depth=Infinity`)
+3. README.md (133 lines) — numbered quick start, complete 10-variable env table covering both workspaces, project structure, security notes
+4. docs/adaptive-card-playbook.md (207 lines) — 4-step card registration guide (choose ID → create JSON → register allowlist → write test), enabling card authors to add cards without reading source
+5. docs/cards/feedback-survey.json — working Adaptive Card v1.5 sample with `Input.ChoiceSet` and `Action.Submit` with `cardId` in data payload
+
+---
+

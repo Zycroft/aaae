@@ -2,21 +2,23 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-20 after v1.0 milestone)
+See: .planning/PROJECT.md (updated 2026-02-20 after v1.1 milestone)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected.
-**Current focus:** Phase 4 complete — verify and transition
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Milestone: v1.1 Polish — Phase 4 COMPLETE (2026-02-20)
-Phase 4: 3/3 plans done (04-01 MetadataPane, 04-02 CI, 04-03 Docs)
-Requirements satisfied: UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03
-Last activity: 2026-02-20 — Phase 4 execution complete
-
-Progress: [██████████] 100% Phase 4 complete (3/3 plans)
+Milestone: v1.1 Polish — COMPLETE (2026-02-20)
+All 4 phases shipped: 16 plans total, all requirements validated.
+Last activity: 2026-02-20 — v1.1 milestone archived
 
 ## Performance Metrics
+
+**v1.1 Velocity:**
+- Total plans completed: 3 (Phase 4)
+- Timeline: 1 day (2026-02-20)
+- Requirements: 6/6 (UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03)
 
 **v1.0 Velocity:**
 - Total plans completed: 13
@@ -38,31 +40,17 @@ Progress: [██████████] 100% Phase 4 complete (3/3 plans)
 
 All decisions logged in PROJECT.md Key Decisions table.
 
-Key outcomes from v1.0:
-- Monorepo npm workspaces ✓ — single Zod instance confirmed
-- `adaptivecards-react` abandoned → custom useRef/useEffect wrapper works cleanly
-- Express fail-closed auth stub ✓ — AUTH_REQUIRED=true is safe default
-- CSS custom properties for theming ✓ — dark/light toggle + localStorage persistence
-
 ### Pending Todos
 
 None.
 
-### Decisions
-
-Phase 4 decisions:
-- MetadataPane receives messages prop from ChatShell (no new hook needed)
-- CI credential pattern COPILOT_[A-Z_]*= catches assignments only (avoids false positives)
-- npm ls zod --depth=Infinity enforces single Zod instance across full workspace tree
-- README env var table expanded to all 10 vars from actual .env.example files
-
 ### Blockers/Concerns
 
-- ESLint missing @react-eslint plugin for JSX type inference — non-blocking, pre-existing
-- 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt
+- ESLint missing @react-eslint plugin for JSX type inference — non-blocking, pre-existing (v2 tech debt)
+- 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt (v2 tech debt)
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: v1.1 Polish milestone COMPLETE — Phase 4 verified, all 6 requirements satisfied. Ready for /gsd:complete-milestone v1.1.
+Stopped at: v1.1 milestone archived. Ready for /gsd:new-milestone.
 Resume file: None

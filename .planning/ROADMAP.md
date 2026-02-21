@@ -18,26 +18,14 @@ Full phase details: `.planning/milestones/v1.0-ROADMAP.md`
 
 </details>
 
-### ✅ v1.1 Polish (Shipped 2026-02-20)
+<details>
+<summary>✅ v1.1 Polish (Phase 4) — SHIPPED 2026-02-20</summary>
 
-### Phase 4: Polish, Metadata Drawer, CI, and Docs
+- [x] Phase 4: Polish, Metadata Drawer, CI, and Docs (3/3 plans) — completed 2026-02-20
 
-**Goal:** The timeline sidebar and activity log download are functional; GitHub Actions runs lint and tests with credential-leak and Zod-instance checks; README and Adaptive Cards playbook give a new developer everything needed to run and extend the app
+Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 
-**Requirements:** UI-11, UI-12, INFRA-07, DOCS-01, DOCS-02, DOCS-03
-
-**Plans:** 3 plans
-
-Plans:
-- [x] 04-01-PLAN.md — MetadataPane component: timeline sidebar (UI-11) and activity log download button (UI-12)
-- [x] 04-02-PLAN.md — GitHub Actions CI workflow: lint, test, credential-leak check, Zod-instance check (INFRA-07)
-- [x] 04-03-PLAN.md — README.md, adaptive-card-playbook.md, and sample card JSON (DOCS-01, DOCS-02, DOCS-03)
-
-**Success Criteria:**
-1. On desktop, the metadata drawer sidebar lists all completed card actions in chronological order; clicking the activity log download button produces a valid JSON file containing the full conversation history
-2. Pushing to the repo triggers a GitHub Actions workflow that lints and tests both workspaces; the workflow fails if `grep -r "COPILOT" client/` returns any matches or `npm ls zod` shows more than one Zod instance
-3. A developer with no prior project knowledge can follow README.md to configure `.env` files, run `npm run dev`, and have a working local instance
-4. A card author can follow `docs/adaptive-card-playbook.md` to register a new card ID, write the card JSON, and wire it through the system without reading source code
+</details>
 
 ## Progress
 
