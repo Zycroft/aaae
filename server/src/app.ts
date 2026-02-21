@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
+import { orgAllowlist } from './middleware/orgAllowlist.js';
 import { chatRouter } from './routes/chat.js';
 
 export function createApp() {
@@ -25,6 +26,10 @@ export function createApp() {
 
   // All /api routes require auth (SERV-09)
   app.use('/api', authMiddleware);
+
+  // Org allowlist — tenant membership check after JWT validation (ORG-01..ORG-04)
+  // Must run AFTER authMiddleware so req.user is populated
+  app.use('/api', orgAllowlist);
 
   // Chat routes (SERV-02, SERV-03, SERV-04)
   app.use('/api/chat', chatRouter);

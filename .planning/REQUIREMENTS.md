@@ -19,19 +19,19 @@ Requirements for v1.2 Entra External ID Authentication (MSAL). Each maps to road
 
 ### Server Authentication
 
-- [ ] **SAUTH-01**: Server validates JWT signature using JWKS from CIAM discovery endpoint
-- [ ] **SAUTH-02**: Server rejects tokens with wrong audience (not `api://{server-app-id}`)
-- [ ] **SAUTH-03**: Server rejects expired tokens
-- [ ] **SAUTH-04**: Server rejects tokens with invalid issuer
-- [ ] **SAUTH-05**: Decoded claims are attached to `req.user` for downstream use
-- [ ] **SAUTH-06**: Invalid/missing tokens return 401 with `WWW-Authenticate` header
+- [x] **SAUTH-01**: Server validates JWT signature using JWKS from CIAM discovery endpoint
+- [x] **SAUTH-02**: Server rejects tokens with wrong audience (not `api://{server-app-id}`)
+- [x] **SAUTH-03**: Server rejects expired tokens
+- [x] **SAUTH-04**: Server rejects tokens with invalid issuer
+- [x] **SAUTH-05**: Decoded claims are attached to `req.user` for downstream use
+- [x] **SAUTH-06**: Invalid/missing tokens return 401 with `WWW-Authenticate` header
 
 ### Org Allowlist
 
-- [ ] **ORG-01**: Server extracts `tid` (tenant ID) claim from validated JWT
-- [ ] **ORG-02**: Server checks `tid` against `ALLOWED_TENANT_IDS` environment variable
-- [ ] **ORG-03**: Disallowed tenants receive 403 with clear error message
-- [ ] **ORG-04**: Denied access attempts are logged (tenant ID, timestamp)
+- [x] **ORG-01**: Server extracts `tid` (tenant ID) claim from validated JWT
+- [x] **ORG-02**: Server checks `tid` against `ALLOWED_TENANT_IDS` environment variable
+- [x] **ORG-03**: Disallowed tenants receive 403 with clear error message
+- [x] **ORG-04**: Denied access attempts are logged (tenant ID, timestamp)
 
 ### Shared Schema
 
@@ -48,8 +48,8 @@ Requirements for v1.2 Entra External ID Authentication (MSAL). Each maps to road
 
 ### Testing
 
-- [ ] **TEST-01**: Unit tests for JWT validation middleware (mock JWKS, test expired/invalid/valid tokens)
-- [ ] **TEST-02**: Unit tests for Org Allowlist middleware (allowed/denied tenants, missing tid)
+- [x] **TEST-01**: Unit tests for JWT validation middleware (mock JWKS, test expired/invalid/valid tokens)
+- [x] **TEST-02**: Unit tests for Org Allowlist middleware (allowed/denied tenants, missing tid)
 - [ ] **TEST-03**: CI continues to pass with new code
 
 ## Future Requirements
@@ -87,18 +87,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CFG-03 | Phase 5 | Complete |
 | CFG-04 | Phase 5 | Complete |
 | CFG-05 | Phase 5 | Complete |
-| SAUTH-01 | Phase 6 | Pending |
-| SAUTH-02 | Phase 6 | Pending |
-| SAUTH-03 | Phase 6 | Pending |
-| SAUTH-04 | Phase 6 | Pending |
-| SAUTH-05 | Phase 6 | Pending |
-| SAUTH-06 | Phase 6 | Pending |
-| ORG-01 | Phase 6 | Pending |
-| ORG-02 | Phase 6 | Pending |
-| ORG-03 | Phase 6 | Pending |
-| ORG-04 | Phase 6 | Pending |
-| TEST-01 | Phase 6 | Pending |
-| TEST-02 | Phase 6 | Pending |
+| SAUTH-01 | Phase 6 | Complete |
+| SAUTH-02 | Phase 6 | Complete |
+| SAUTH-03 | Phase 6 | Complete |
+| SAUTH-04 | Phase 6 | Complete |
+| SAUTH-05 | Phase 6 | Complete |
+| SAUTH-06 | Phase 6 | Complete |
+| ORG-01 | Phase 6 | Complete |
+| ORG-02 | Phase 6 | Complete |
+| ORG-03 | Phase 6 | Complete |
+| ORG-04 | Phase 6 | Complete |
+| TEST-01 | Phase 6 | Complete |
+| TEST-02 | Phase 6 | Complete |
 | CAUTH-01 | Phase 7 | Pending |
 | CAUTH-02 | Phase 7 | Pending |
 | CAUTH-03 | Phase 7 | Pending |

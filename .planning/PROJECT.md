@@ -62,17 +62,17 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ Shared auth types (UserClaims schema) in shared/ — v1.2 Phase 5
 - ✓ AUTH_REQUIRED=false bypass preserved for local dev — v1.2 Phase 5
 - ✓ Environment variables documented in .env.example files — v1.2 Phase 5
+- ✓ Server validates JWT access tokens (signature, audience, issuer, expiry) — v1.2 Phase 6
+- ✓ Org Allowlist blocks requests from disallowed tenants (403) — v1.2 Phase 6
+- ✓ Unit tests for JWT validation and Org Allowlist middleware — v1.2 Phase 6
 
 ### Active
 
 <!-- Current scope: v1.2 Entra External ID Authentication (MSAL) -->
 
 - [ ] Client authenticates users via MSAL React against Entra External ID (CIAM)
-- [ ] Server validates JWT access tokens (signature, audience, issuer, expiry)
-- [ ] Org Allowlist blocks requests from disallowed tenants (403)
 - [ ] Sign-out clears MSAL cache and returns to sign-in page
 - [ ] Token refresh happens silently (no mid-conversation logouts)
-- [ ] Unit tests for JWT validation and Org Allowlist middleware
 
 ### Out of Scope
 
@@ -146,6 +146,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | oid required in UserClaims (not optional) | Stable Azure AD object ID always present in Entra External ID tokens | ✓ Good — needed for user identity in JWT middleware |
 | Fail-closed AZURE_CLIENT_ID guard at startup | process.exit(1) when AUTH_REQUIRED=true but AZURE_CLIENT_ID missing | ✓ Good — no silent passthrough possible |
 | ALLOWED_TENANT_IDS parsed to string[] at config load | Avoids repeated split in middleware; filter(Boolean) removes empty strings | ✓ Good — clean for Phase 6 consumption |
+| jose over jsonwebtoken+jwks-rsa | Pure ESM, built-in JWKS caching/rotation, typed errors map to our error codes | ✓ Good — v6 errors namespace needed adaptation but clean |
+| createRemoteJWKSet called once at module load | jose handles JWKS caching and key rotation internally | ✓ Good — no per-request overhead |
+| Synchronous orgAllowlist middleware | Array.includes on in-memory string[] — no async needed | ✓ Good — simple and fast |
 
 ---
-*Last updated: 2026-02-21 after Phase 5*
+*Last updated: 2026-02-21 after Phase 6*

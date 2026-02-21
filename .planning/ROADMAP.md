@@ -34,7 +34,7 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 **Milestone Goal:** Replace v1 auth stubs with real MSAL-based authentication — Entra External ID on the client, JWT validation + org allowlist on the server.
 
 - [x] **Phase 5: Shared Schema + Config Foundation** - UserClaims Zod schema and environment variable wiring for both workspaces (completed 2026-02-21)
-- [ ] **Phase 6: Server JWT Validation + Org Allowlist** - JWT middleware validates tokens via JWKS; org allowlist enforces tenant restrictions
+- [x] **Phase 6: Server JWT Validation + Org Allowlist** - JWT middleware validates tokens via JWKS; org allowlist enforces tenant restrictions (completed 2026-02-21)
 - [ ] **Phase 7: Client MSAL Authentication** - MSAL React sign-in/sign-out gate with silent token refresh and Bearer header injection
 
 ## Phase Details
@@ -81,7 +81,12 @@ Plans:
   3. Every API call (start, send, card-action) includes an `Authorization: Bearer {token}` header automatically; no manual token handling is visible to the user
   4. A user who has been in a conversation for an extended period is not logged out mid-conversation — token refresh happens silently without any UI disruption
   5. Clicking sign-out clears the MSAL token cache and returns the browser to the sign-in page
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — MSAL install + msalConfig.ts + AuthProvider wrapper component
+- [ ] 07-02-PLAN.md — AuthGuard + SignInPage + App/main.tsx wiring (auth gate)
+- [ ] 07-03-PLAN.md — Bearer token injection in chatApi.ts + sign-out in ChatShell + CI verification
 
 ## Progress
 
@@ -92,5 +97,5 @@ Plans:
 | 3. Adaptive Cards + Accessibility + Theming | v1.0 | 5/5 | Complete | 2026-02-20 |
 | 4. Polish, Metadata Drawer, CI, and Docs | v1.1 | 3/3 | Complete | 2026-02-20 |
 | 5. Shared Schema + Config Foundation | v1.2 | 2/2 | Complete | 2026-02-21 |
-| 6. Server JWT Validation + Org Allowlist | v1.2 | 0/2 | Not started | - |
-| 7. Client MSAL Authentication | v1.2 | 0/TBD | Not started | - |
+| 6. Server JWT Validation + Org Allowlist | v1.2 | 2/2 | Complete | 2026-02-21 |
+| 7. Client MSAL Authentication | v1.2 | 0/3 | Not started | - |
