@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** Planning next milestone
+**Current focus:** v1.4 Persistent State Store (Azure Cache for Redis)
 
 ## Current Position
 
-Phase: None — between milestones
-Plan: N/A
-Status: v1.3b shipped, ready for next milestone planning
-Last activity: 2026-02-21 — v1.3b milestone archived
-
-Progress: [██████████] v1.3b: SHIPPED — Copilot Studio SDK Orchestrator Readiness
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-21 — Milestone v1.4 started
 
 ## Performance Metrics
 
@@ -54,10 +52,11 @@ None.
 
 - ESLint missing @react-eslint plugin — pre-existing tech debt, non-blocking
 - 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt, non-blocking
+- sdkConversationRef serialization risk: JSON round-trip must produce usable SDK reference (test explicitly in v1.4)
 
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: v1.3b milestone archived
-Resume file: .planning/MILESTONES.md
-Next step: /gsd:new-milestone
+Stopped at: v1.4 milestone initialization
+Resume file: .planning/STATE.md
+Next step: Define requirements → create roadmap

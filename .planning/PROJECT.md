@@ -85,7 +85,18 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-(No active requirements — next milestone not yet defined. Use `/gsd:new-milestone` to start.)
+## Current Milestone: v1.4 Persistent State Store (Azure Cache for Redis)
+
+**Goal:** Replace in-memory conversation store with Redis-backed persistent state, preparing the expanded data model for the Workflow Orchestrator (v1.5).
+
+**Target features:**
+- Redis-backed ConversationStore via ioredis with TLS, TTL, and timeouts
+- Expanded StoredConversation model (userId, tenantId, timestamps, status, workflow fields)
+- Store factory pattern: auto-select Redis vs InMemory based on REDIS_URL
+- User-scoped queries (listByUser) with sorted set secondary index
+- Health check endpoint reporting Redis connectivity
+- Graceful failure (503 when Redis unavailable, no silent fallback)
+- Chat routes populate new fields from JWT claims (v1.2)
 
 ### Out of Scope
 
@@ -158,4 +169,4 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | CONDITIONAL GO vs absolute GO | Latency + context injection live measurements pending credentials; code architecture is complete | ✓ Good — honest assessment, clear conditions |
 
 ---
-*Last updated: 2026-02-21 after v1.3b milestone*
+*Last updated: 2026-02-21 after v1.4 milestone start*
