@@ -80,13 +80,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| — | — | — |
+| SCHEMA-01 | Phase 5 | Pending |
+| SCHEMA-02 | Phase 5 | Pending |
+| CFG-01 | Phase 5 | Pending |
+| CFG-02 | Phase 5 | Pending |
+| CFG-03 | Phase 5 | Pending |
+| CFG-04 | Phase 5 | Pending |
+| CFG-05 | Phase 5 | Pending |
+| SAUTH-01 | Phase 6 | Pending |
+| SAUTH-02 | Phase 6 | Pending |
+| SAUTH-03 | Phase 6 | Pending |
+| SAUTH-04 | Phase 6 | Pending |
+| SAUTH-05 | Phase 6 | Pending |
+| SAUTH-06 | Phase 6 | Pending |
+| ORG-01 | Phase 6 | Pending |
+| ORG-02 | Phase 6 | Pending |
+| ORG-03 | Phase 6 | Pending |
+| ORG-04 | Phase 6 | Pending |
+| TEST-01 | Phase 6 | Pending |
+| TEST-02 | Phase 6 | Pending |
+| CAUTH-01 | Phase 7 | Pending |
+| CAUTH-02 | Phase 7 | Pending |
+| CAUTH-03 | Phase 7 | Pending |
+| CAUTH-04 | Phase 7 | Pending |
+| CAUTH-05 | Phase 7 | Pending |
+| CAUTH-06 | Phase 7 | Pending |
+| CAUTH-07 | Phase 7 | Pending |
+| TEST-03 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-20*
-*Last updated: 2026-02-20 after initial definition*
+*Last updated: 2026-02-20 after roadmap creation (Phases 5–7)*
