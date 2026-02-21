@@ -60,22 +60,6 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ README: monorepo quick start, full env var table (10 vars), project structure, security notes — v1.1
 - ✓ docs/adaptive-card-playbook.md: 4-step card registration guide, allowlist wiring, test pattern — v1.1
 - ✓ docs/cards/feedback-survey.json: sample Adaptive Card v1.5 with ChoiceSet and Action.Submit — v1.1
-<<<<<<< HEAD
-- ✓ Shared auth types (UserClaims schema) in shared/ — v1.2 Phase 5
-- ✓ AUTH_REQUIRED=false bypass preserved for local dev — v1.2 Phase 5
-- ✓ Environment variables documented in .env.example files — v1.2 Phase 5
-- ✓ Server validates JWT access tokens (signature, audience, issuer, expiry) — v1.2 Phase 6
-- ✓ Org Allowlist blocks requests from disallowed tenants (403) — v1.2 Phase 6
-- ✓ Unit tests for JWT validation and Org Allowlist middleware — v1.2 Phase 6
-
-### Active
-
-<!-- Current scope: v1.2 Entra External ID Authentication (MSAL) -->
-
-- [ ] Client authenticates users via MSAL React against Entra External ID (CIAM)
-- [ ] Sign-out clears MSAL cache and returns to sign-in page
-- [ ] Token refresh happens silently (no mid-conversation logouts)
-=======
 - ✓ Shared auth types (UserClaims schema) in shared/ — v1.2
 - ✓ AUTH_REQUIRED=false bypass preserved for local dev — v1.2
 - ✓ Environment variables documented in .env.example files — v1.2
@@ -88,8 +72,26 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-*No active requirements — next milestone not yet defined. Use `/gsd:new-milestone` to start.*
->>>>>>> gsd/phase-07-client-msal-authentication
+#### v1.3b — Copilot Studio SDK: Orchestrator Readiness
+
+**Structured Output Extraction:**
+- [ ] Server can extract structured JSON from activity.value, activity.entities, and text-embedded responses
+- [ ] ExtractedPayload Zod schema validates all extraction surfaces with confidence level
+- [ ] activityNormalizer populates extractedPayload on NormalizedMessage
+
+**Context Injection:**
+- [ ] SendMessageRequest accepts optional workflowContext (step, constraints, collectedData)
+- [ ] Server injects workflowContext as structured prefix into outbound Copilot messages
+- [ ] Context injection tested with live Copilot agent without breaking responses
+
+**Orchestrator Infrastructure:**
+- [ ] WorkflowState type defined in shared schema
+- [ ] POST /api/chat/orchestrate endpoint accepts query + workflowContext, returns messages + extractedPayload + latencyMs
+- [ ] Conversation continuity verified across 3+ SDK turns
+
+**Performance & Evaluation:**
+- [ ] Latency baselines measured (startConversation, sendMessage, full round-trip)
+- [ ] SDK-EVALUATION.md with GO/CONDITIONAL GO recommendation for v1.5
 
 ### Out of Scope
 
@@ -139,28 +141,28 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | COPILOT_[A-Z_]*= grep pattern for CI | Catches credential assignments without false-positiving on code identifiers | ✓ Good — correctly distinguishes COPILOT_TENANT_ID= from CopilotStudioClient |
 | npm ls zod --depth=Infinity | Enforces single Zod instance across full workspace tree, not just direct deps | ✓ Good — would catch hoisted duplicates that --depth=0 would miss |
 | MetadataPane as prop-receiving component | No new hook needed; ChatShell already owns message state | ✓ Good — clean composition, simple to test |
-<<<<<<< HEAD
-
-| Entra External ID (CIAM) over standard Entra ID | CIAM uses `ciamlogin.com` authority URLs; designed for customer-facing apps | — Pending |
-=======
 | Entra External ID (CIAM) over standard Entra ID | CIAM uses `ciamlogin.com` authority URLs; designed for customer-facing apps | ✓ Good — clean separation from internal tenant |
->>>>>>> gsd/phase-07-client-msal-authentication
 | oid required in UserClaims (not optional) | Stable Azure AD object ID always present in Entra External ID tokens | ✓ Good — needed for user identity in JWT middleware |
 | Fail-closed AZURE_CLIENT_ID guard at startup | process.exit(1) when AUTH_REQUIRED=true but AZURE_CLIENT_ID missing | ✓ Good — no silent passthrough possible |
 | ALLOWED_TENANT_IDS parsed to string[] at config load | Avoids repeated split in middleware; filter(Boolean) removes empty strings | ✓ Good — clean for Phase 6 consumption |
 | jose over jsonwebtoken+jwks-rsa | Pure ESM, built-in JWKS caching/rotation, typed errors map to our error codes | ✓ Good — v6 errors namespace needed adaptation but clean |
 | createRemoteJWKSet called once at module load | jose handles JWKS caching and key rotation internally | ✓ Good — no per-request overhead |
 | Synchronous orgAllowlist middleware | Array.includes on in-memory string[] — no async needed | ✓ Good — simple and fast |
-<<<<<<< HEAD
-
----
-*Last updated: 2026-02-21 after Phase 6*
-=======
 | @azure/msal-react v3.x (not v5) | v5 requires React 19; v3.0.26 is last React 18-compatible release | ✓ Good — pinned, no upgrade needed until React 19 migration |
 | sessionStorage for MSAL token cache | Tokens tab-scoped, cleared on tab close; safer than localStorage | ✓ Good — no cross-tab leakage |
 | AuthGuard 3-phase state machine | Skeleton → SignIn → Chat; checks InteractionStatus.None before rendering | ✓ Good — prevents redirect loops |
 | Token-as-parameter pattern for chatApi | chatApi functions accept token string; acquisition stays in ChatShell | ✓ Good — clean separation, hook stays testable |
 
+## Current Milestone: v1.3b Copilot Studio SDK: Orchestrator Readiness
+
+**Goal:** Validate and formalize the Copilot Studio SDK path for structured output extraction, context injection, and orchestrator-ready infrastructure — closing all gaps between the current SDK integration and what the v1.5 Workflow Orchestrator requires.
+
+**Target features:**
+- Structured JSON extraction from Copilot responses (activity.value, activity.entities, text-embedded)
+- Context injection into outbound Copilot messages for workflow-driven queries
+- Orchestrator-ready endpoint (POST /api/chat/orchestrate) with latency measurement
+- Multi-turn workflow state management
+- SDK evaluation document with GO/CONDITIONAL GO recommendation for v1.5
+
 ---
-*Last updated: 2026-02-21 after v1.2 milestone archived*
->>>>>>> gsd/phase-07-client-msal-authentication
+*Last updated: 2026-02-21 after v1.3b milestone started*
