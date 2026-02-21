@@ -70,9 +70,11 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
           rows={1}
           maxLength={MAX_CHARS + 1} // Allow one over to show counter, submit blocked
           aria-label="Message input"
+          aria-multiline="true"
         />
         <button
           className="sendButton"
+          type="button"
           onClick={submit}
           disabled={disabled || !text.trim()}
           aria-label="Send message"

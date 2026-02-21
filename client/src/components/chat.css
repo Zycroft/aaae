@@ -1,11 +1,156 @@
-/* Global reset applied at component level */
+/* ─────────────────────────────────────────────────────────────────────────────
+   Global Reset
+   ───────────────────────────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   CSS Custom Properties — Design Tokens
+   UI-13: Dark/light theme via [data-theme] attribute
+   UI-14: Fluid typography with clamp(), spacing scale
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Colors — Light Theme ────────────────────────────────────────────────── */
+  --color-bg: #ffffff;
+  --color-surface: #f3f2f1;
+  --color-primary: #0078d4;
+  --color-primary-hover: #006cbf;
+  --color-text: #323130;
+  --color-text-inverse: #ffffff;
+  --color-text-muted: #666666;
+  --color-border: #e0e0e0;
+  --color-error-bg: #fde7e9;
+  --color-error-text: #a4262c;
+  --color-error-border: #f1b8bb;
+  --color-avatar-user-bg: #0078d4;
+  --color-avatar-user-text: #ffffff;
+  --color-avatar-bot-bg: #e8e8e8;
+  --color-avatar-bot-text: #444444;
+  --color-skeleton: #ebebeb;
+  --color-skeleton-shine: #f5f5f5;
+  --color-skeleton-dot: #999999;
+  --color-card-surface: #ffffff;
+  --color-card-border: #e0e0e0;
+  --color-focus-ring: rgba(0, 120, 212, 0.4);
+  --color-input-border: #c8c8c8;
+  --color-input-border-focus: #0078d4;
+  --color-char-counter: #666666;
+  --color-char-warning: #a4262c;
+
+  /* ── Typography (UI-14: fluid with clamp) ────────────────────────────────── */
+  --font-size-xs: clamp(10px, 1.2vw, 11px);
+  --font-size-sm: clamp(11px, 1.4vw, 12px);
+  --font-size-base: clamp(13px, 1.8vw, 14px);
+  --font-size-lg: clamp(14px, 2vw, 16px);
+
+  /* ── Spacing ─────────────────────────────────────────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+
+  /* ── Transitions ─────────────────────────────────────────────────────────── */
+  --transition-base: 0.15s ease;
+}
+
+/* ── Dark Theme ──────────────────────────────────────────────────────────────
+   Applied when document.documentElement.dataset.theme = "dark"
+   UI-13: Dark/light theme persisted to localStorage
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --color-bg: #1b1a19;
+  --color-surface: #2d2c2b;
+  --color-primary: #4da3e0;
+  --color-primary-hover: #6eb4e8;
+  --color-text: #f3f2f1;
+  --color-text-inverse: #1b1a19;
+  --color-text-muted: #a0a0a0;
+  --color-border: #3d3c3b;
+  --color-error-bg: #3d1c1e;
+  --color-error-text: #f4a8ab;
+  --color-error-border: #6b2f33;
+  --color-avatar-user-bg: #4da3e0;
+  --color-avatar-user-text: #1b1a19;
+  --color-avatar-bot-bg: #3d3c3b;
+  --color-avatar-bot-text: #c8c8c8;
+  --color-skeleton: #2d2c2b;
+  --color-skeleton-shine: #3d3c3b;
+  --color-skeleton-dot: #666666;
+  --color-card-surface: #2d2c2b;
+  --color-card-border: #3d3c3b;
+  --color-focus-ring: rgba(77, 163, 224, 0.4);
+  --color-input-border: #4d4c4b;
+  --color-input-border-focus: #4da3e0;
+  --color-char-counter: #a0a0a0;
+  --color-char-warning: #f4a8ab;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Focus Visible (UI-17: keyboard navigation + visible focus rings)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   App Layout — Responsive Split-Pane (UI-01)
+   Mobile: single column; Desktop ≥768px: chat + metadata drawer
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.appLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.chatPane {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  min-width: 0; /* prevent grid blowout */
+}
+
+.metadataPane {
+  display: none; /* hidden on mobile */
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  overflow-y: auto;
+}
+
+.metadataPanePlaceholder {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  padding: var(--space-4);
+  margin: 0;
+  font-style: italic;
+}
+
+@media (min-width: 768px) {
+  .appLayout {
+    grid-template-columns: 1fr 280px;
+  }
+
+  .metadataPane {
+    display: block;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -15,18 +160,52 @@ body {
 .chatShell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: #fff;
+  height: 100%;
+  background: var(--color-bg);
   overflow: hidden;
+  position: relative;
 }
 
 .globalError {
-  background: #fde7e9;
-  color: #a4262c;
-  padding: 10px 16px;
-  font-size: 14px;
-  border-bottom: 1px solid #f1b8bb;
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+  padding: 10px var(--space-4);
+  font-size: var(--font-size-base);
+  border-bottom: 1px solid var(--color-error-border);
   flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Theme Toggle (UI-13)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.themeToggle {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-base), border-color var(--transition-base);
+}
+
+.themeToggle:hover {
+  background: var(--color-border);
+}
+
+.themeToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -36,10 +215,10 @@ body {
 .transcriptView {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 16px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -48,7 +227,7 @@ body {
 
 .messageBubble {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: flex-start;
   max-width: 100%;
 }
@@ -73,13 +252,13 @@ body {
 }
 
 .avatar.userAvatar {
-  background: #0078d4;
-  color: #fff;
+  background: var(--color-avatar-user-bg);
+  color: var(--color-avatar-user-text);
 }
 
 .avatar.botAvatar {
-  background: #e8e8e8;
-  color: #444;
+  background: var(--color-avatar-bot-bg);
+  color: var(--color-avatar-bot-text);
 }
 
 .bubbleContent {
@@ -88,20 +267,20 @@ body {
   padding: 10px 14px;
   word-break: break-word;
   line-height: 1.45;
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
-/* Bot bubble: subtle grey */
+/* Bot bubble */
 .messageBubble.assistant .bubbleContent {
-  background: #f3f2f1;
-  color: #323130;
+  background: var(--color-surface);
+  color: var(--color-text);
   border-bottom-left-radius: 4px;
 }
 
-/* User bubble: brand blue */
+/* User bubble */
 .messageBubble.user .bubbleContent {
-  background: #0078d4;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border-bottom-right-radius: 4px;
 }
 
@@ -110,20 +289,19 @@ body {
   opacity: 0.65;
 }
 
-/* Placeholder for cards (Phase 3) */
+/* Placeholder for cards (superseded in Phase 3) */
 .cardPlaceholder {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-style: italic;
   opacity: 0.75;
 }
 
 /* Inline error below the user bubble */
 .inlineError {
-  font-size: 12px;
-  color: #a4262c;
-  margin-top: 4px;
-  /* Indented past avatar (32px) + gap (8px) = 40px, mirrored for user bubbles */
-  padding-left: 40px;
+  font-size: var(--font-size-sm);
+  color: var(--color-error-text);
+  margin-top: var(--space-1);
+  padding-left: 40px; /* avatar (32px) + gap (8px) */
 }
 
 .messageBubble.user + .inlineError {
@@ -132,13 +310,78 @@ body {
   padding-right: 40px;
 }
 
+/* Card submit chip (UI-10) */
+.cardSubmitChip {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+  max-width: min(70%, 420px);
+  word-break: break-word;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Adaptive Cards (UI-06, UI-07, UI-08)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.adaptiveCardWrapper {
+  position: relative;
+  max-width: min(90%, 520px);
+  border: 1px solid var(--color-card-border);
+  border-radius: 8px;
+  background: var(--color-card-surface);
+  overflow: hidden;
+  overflow-x: auto; /* 360px overflow handling */
+}
+
+.adaptiveCardWrapper.submitted {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.cardPendingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.15);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  z-index: 1;
+}
+
+.adaptiveCardContainer {
+  padding: var(--space-3);
+}
+
+.cardRenderError {
+  color: var(--color-error-text);
+  font-size: var(--font-size-sm);
+  padding: var(--space-3);
+  margin: 0;
+}
+
+/* Focus visibility for Adaptive Card SDK-rendered elements */
+.adaptiveCardContainer button:focus-visible,
+.adaptiveCardContainer input:focus-visible,
+.adaptiveCardContainer select:focus-visible,
+.adaptiveCardContainer textarea:focus-visible {
+  outline: 2px solid var(--color-primary) !important;
+  outline-offset: 2px !important;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Skeleton / Loading
    ───────────────────────────────────────────────────────────────────────────── */
 
 .skeletonBubble {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: flex-start;
 }
 
@@ -146,7 +389,7 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #e0e0e0;
+  background: var(--color-skeleton);
   flex-shrink: 0;
 }
 
@@ -157,9 +400,9 @@ body {
   border-bottom-left-radius: 4px;
   background: linear-gradient(
     90deg,
-    #ebebeb 25%,
-    #f5f5f5 50%,
-    #ebebeb 75%
+    var(--color-skeleton) 25%,
+    var(--color-skeleton-shine) 50%,
+    var(--color-skeleton) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
@@ -180,10 +423,10 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #999;
+  background: var(--color-skeleton-dot);
   box-shadow:
-    12px 0 0 #999,
-    24px 0 0 #999;
+    12px 0 0 var(--color-skeleton-dot),
+    24px 0 0 var(--color-skeleton-dot);
   animation: typingDots 1.2s infinite;
 }
 
@@ -198,61 +441,68 @@ body {
 
 .chatInputArea {
   flex-shrink: 0;
-  padding: 12px 16px;
-  border-top: 1px solid #e0e0e0;
-  background: #fff;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
 }
 
 .inputRow {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: flex-end;
 }
 
 .chatTextarea {
   flex: 1;
   resize: none;
-  border: 1px solid #c8c8c8;
+  border: 1px solid var(--color-input-border);
   border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
+  padding: 10px var(--space-3);
+  font-size: var(--font-size-base);
   font-family: inherit;
   line-height: 1.45;
   min-height: 44px;
   max-height: 160px;
   overflow-y: auto;
   outline: none;
-  transition: border-color 0.15s;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color var(--transition-base);
 }
 
 .chatTextarea:focus {
-  border-color: #0078d4;
-  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+  border-color: var(--color-input-border-focus);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.chatTextarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chatTextarea:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: #fafafa;
+  background: var(--color-surface);
 }
 
 .sendButton {
   padding: 0 18px;
   height: 44px;
-  background: #0078d4;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: background var(--transition-base);
   flex-shrink: 0;
 }
 
 .sendButton:hover:not(:disabled) {
-  background: #006cbf;
+  background: var(--color-primary-hover);
 }
 
 .sendButton:disabled {
@@ -260,14 +510,50 @@ body {
   cursor: not-allowed;
 }
 
+.sendButton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
 .charCounter {
-  font-size: 12px;
-  color: #666;
+  font-size: var(--font-size-sm);
+  color: var(--color-char-counter);
   text-align: right;
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .charCounter.warning {
-  color: #a4262c;
+  color: var(--color-char-warning);
   font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Utility: Screen-reader-only text
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Reduced Motion (UI-15)
+   Disables all animations and transitions when user prefers reduced motion.
+   Covers: skeleton shimmer, typing dots, button transitions, theme transitions.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

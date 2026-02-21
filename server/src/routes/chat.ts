@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { Activity } from '@microsoft/agents-activity';
 import { ActivityTypes } from '@microsoft/agents-activity';
-import { SendMessageRequestSchema } from '@copilot-chat/shared';
+import { SendMessageRequestSchema, CardActionRequestSchema } from '@copilot-chat/shared';
+import { validateCardAction } from '../allowlist/cardActionAllowlist.js';
 import { copilotClient } from '../copilot.js';
 import { conversationStore } from '../store/index.js';
 import { normalizeActivities } from '../normalizer/activityNormalizer.js';
@@ -100,5 +101,72 @@ chatRouter.post('/send', async (req, res) => {
   } catch (err) {
     console.error('[chat/send] Error sending message:', err);
     res.status(502).json({ error: 'Failed to send message to Copilot Studio' });
+  }
+});
+
+/**
+ * POST /api/chat/card-action
+ * Validates and forwards an Adaptive Card submit action to Copilot Studio.
+ * Request: { conversationId, cardId, userSummary, submitData }
+ * Returns: { conversationId: string, messages: NormalizedMessage[] }
+ *
+ * Enforces:
+ *   SERV-07: Action type allowlist (rejects disallowed types with 403)
+ *   SERV-08: Action.OpenUrl domain allowlist (rejects disallowed domains with 403)
+ *
+ * SERV-04
+ */
+chatRouter.post('/card-action', async (req, res) => {
+  // 1. Validate request body shape
+  const parsed = CardActionRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request', details: parsed.error.format() });
+    return;
+  }
+  const { conversationId, cardId, userSummary, submitData } = parsed.data;
+
+  // 2. Validate action against allowlist BEFORE any Copilot call (SERV-07, SERV-08)
+  const allowlistResult = validateCardAction(submitData);
+  if (!allowlistResult.ok) {
+    console.warn(`[chat/card-action] Rejected: ${allowlistResult.reason}`);
+    res.status(403).json({ error: allowlistResult.reason });
+    return;
+  }
+
+  // 3. Look up conversation
+  const conversation = await conversationStore.get(conversationId);
+  if (!conversation) {
+    res.status(404).json({ error: 'Conversation not found' });
+    return;
+  }
+
+  try {
+    // 4. Build card action activity — userSummary as the text, submitData as the value
+    const cardActivity: Activity = {
+      type: ActivityTypes.Message,
+      text: userSummary,
+      value: { ...submitData, cardId },
+    } as Activity;
+
+    // 5. Forward to Copilot Studio
+    const collectedActivities: Activity[] = [];
+    for await (const activity of copilotClient.sendActivityStreaming(cardActivity)) {
+      collectedActivities.push(activity);
+    }
+
+    // 6. Normalize to NormalizedMessage[]
+    const messages = normalizeActivities(collectedActivities);
+
+    // 7. Update conversation history
+    await conversationStore.set(conversationId, {
+      ...conversation,
+      history: [...conversation.history, ...messages],
+    });
+
+    // 8. Return normalized messages
+    res.status(200).json({ conversationId, messages });
+  } catch (err) {
+    console.error('[chat/card-action] Error forwarding card action:', err);
+    res.status(502).json({ error: 'Failed to forward card action to Copilot Studio' });
   }
 });

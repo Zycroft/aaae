@@ -2,64 +2,60 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-19)
+See: .planning/PROJECT.md (updated 2026-02-20 after v1.0 milestone)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected.
-**Current focus:** Phase 3 — Adaptive Cards + Accessibility + Theming (Phase 2 complete 2026-02-20)
+**Current focus:** Planning next milestone (v1.1 Polish — Phase 4)
 
 ## Current Position
 
-Phase: 2 of 4 (Text Chat End-to-End) — COMPLETE
-Plan: 4 of 4 in Phase 2 (ALL COMPLETE) — Phase 3 next
-Status: Phase 2 complete; ready for Phase 3 planning
-Last activity: 2026-02-20 — Phase 2 complete: all 4 plans done, 8 requirements satisfied (SERV-03, SERV-06, SERV-11, UI-02, UI-03, UI-04, UI-05, UI-09)
+Milestone: v1.0 MVP — COMPLETE (shipped 2026-02-20)
+Phases 1–3: all 13 plans done, 37 requirements satisfied
+Status: v1.0 archived; ready to plan v1.1 (Phase 4)
+Last activity: 2026-02-20 — v1.0 milestone archived; ROADMAP.md reorganized; PROJECT.md evolved
 
-Progress: [████░░░░░░] 50% (8/8 plans in Phases 1-2 complete; 8/~16 total plans est.)
+Progress: [██████████] 100% v1.0 complete (3/3 phases, 13/13 plans)
 
 ## Performance Metrics
 
-**Velocity:**
-- Total plans completed: 4
-- Average duration: 8.5 min
-- Total execution time: 0.57 hours
+**v1.0 Velocity:**
+- Total plans completed: 13
+- Timeline: 1 day (2026-02-19 → 2026-02-20)
+- Files: 91 changed, 20,063 insertions, ~2,341 LOC TypeScript/JS
 
 **By Phase:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| Phase 1 | 4/4 | 34 min | 8.5 min |
-| Phase 2 | 4/4 | ~10 min | ~2.5 min |
-
-**Recent Trend:**
-- Last 5 plans: 01-04 (6 min), 02-01 (2 min), 02-02 (2 min), 02-03 (2 min), 02-04 (2 min)
-- Trend: ~2 min/plan in Phase 2 (pure implementation, no scaffolding overhead)
-
-*Updated after each plan completion*
+| Phase | Plans | Status |
+|-------|-------|--------|
+| Phase 1 | 4/4 | Complete |
+| Phase 2 | 4/4 | Complete |
+| Phase 3 | 5/5 | Complete |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+All decisions logged in PROJECT.md Key Decisions table.
 
-- [Pre-phase]: Monorepo with npm workspaces — shared types without a separate publish step
-- [Pre-phase]: Zod declared in `shared/` only — prevents dual-instance hoisting (verified via `npm ls zod`)
-- [Pre-phase]: Custom `useRef`/`useEffect` Adaptive Cards wrapper — `adaptivecards-react` abandoned for React 18
-- [Pre-phase]: Auth stub must be fail-closed (`AUTH_REQUIRED=true` default; bypass only via explicit env var with `NODE_ENV !== 'production'` guard)
+Key outcomes from v1.0:
+- Monorepo npm workspaces ✓ — single Zod instance confirmed
+- `adaptivecards-react` abandoned → custom useRef/useEffect wrapper works cleanly
+- Express fail-closed auth stub ✓ — AUTH_REQUIRED=true is safe default
+- CSS custom properties for theming ✓ — dark/light toggle + localStorage persistence
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- [Phase 1]: Verify `CopilotStudioConnectionSettings` fields (`directConnectUrl` vs named-settings branching) against actual Copilot Studio environment before implementing the stub — wrong config produces cryptic errors
-- [Phase 1]: Confirm whether `CopilotStudioClient` v1.2.3 handles DirectLine token refresh internally or requires explicit refresh call (30-min expiry)
-- [Phase 3]: `adaptivecards` v3 `render()` API and `onExecuteAction` callback signature should be verified against current npm package — community examples reference the abandoned React wrapper and may be outdated
+Carried into v1.1:
+- Missing VERIFICATION.md for Phases 1 & 3 (functional verification done via Phase 2 VERIFICATION.md + Phase 3 UAT; documentation gap only — acceptable as known gap)
+- Metadata drawer `aside.metadataPane` is a placeholder — Phase 4 work (UI-11, UI-12)
+- ESLint missing @react-eslint plugin for JSX type inference — non-blocking, no runtime impact
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Phase 2 COMPLETE (all 4 plans done, d336add final commit). Phase 3 planning next.
+Stopped at: v1.0 milestone COMPLETE. Phase 4 planning next.
 Resume file: None

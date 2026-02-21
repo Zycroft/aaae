@@ -6,6 +6,11 @@ import { SkeletonBubble } from './SkeletonBubble.js';
 interface TranscriptViewProps {
   messages: TranscriptMessage[];
   isLoading: boolean;
+  onCardAction: (
+    cardId: string,
+    userSummary: string,
+    submitData: Record<string, unknown>
+  ) => void;
 }
 
 /**
@@ -15,9 +20,11 @@ interface TranscriptViewProps {
  * within 100px of the bottom (Claude's discretion). If the user has
  * scrolled up to review history, auto-scroll does not interrupt.
  *
- * UI-02, UI-03, UI-04
+ * Passes onCardAction down to each MessageBubble for Adaptive Card submit handling.
+ *
+ * UI-02, UI-03, UI-04, UI-07
  */
-export function TranscriptView({ messages, isLoading }: TranscriptViewProps) {
+export function TranscriptView({ messages, isLoading, onCardAction }: TranscriptViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Smart scroll: scroll to bottom only if already near the bottom
@@ -34,9 +41,16 @@ export function TranscriptView({ messages, isLoading }: TranscriptViewProps) {
   }, [messages, isLoading]);
 
   return (
-    <div className="transcriptView" ref={containerRef}>
+    <div
+      className="transcriptView"
+      ref={containerRef}
+      role="log"
+      aria-live="polite"
+      aria-label="Conversation transcript"
+      aria-relevant="additions"
+    >
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+        <MessageBubble key={message.id} message={message} onCardAction={onCardAction} />
       ))}
       {isLoading && <SkeletonBubble />}
     </div>

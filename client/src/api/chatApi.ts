@@ -54,3 +54,34 @@ export async function sendMessage(
 
   return response.json() as Promise<{ conversationId: string; messages: NormalizedMessage[] }>;
 }
+
+/**
+ * Forwards an Adaptive Card submit action to the server for validation and Copilot proxying.
+ * Returns { conversationId, messages: NormalizedMessage[] }.
+ * Throws with status property preserved on non-ok responses.
+ *
+ * UI-07: Calls /api/chat/card-action with cardId, userSummary, submitData
+ */
+export async function sendCardAction(
+  conversationId: string,
+  cardId: string,
+  userSummary: string,
+  submitData: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<{ conversationId: string; messages: NormalizedMessage[] }> {
+  const response = await fetch('/api/chat/card-action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversationId, cardId, userSummary, submitData }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(`HTTP ${response.status}`),
+      { status: response.status },
+    );
+  }
+
+  return response.json() as Promise<{ conversationId: string; messages: NormalizedMessage[] }>;
+}

@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useRef } from 'react';
 import type { NormalizedMessage } from '@copilot-chat/shared';
-import { startConversation, sendMessage } from '../api/chatApi.js';
+import { startConversation, sendMessage, sendCardAction } from '../api/chatApi.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -12,6 +12,8 @@ export type MessageStatus = 'sending' | 'sent' | 'error';
 export type TranscriptMessage = NormalizedMessage & {
   status?: MessageStatus;
   errorMessage?: string;
+  /** 'cardSubmit' = user bubble rendered as a chip after card submission (UI-10) */
+  subKind?: 'cardSubmit';
 };
 
 type State = {
@@ -29,6 +31,7 @@ type Action =
   | { type: 'START_LOADING' }
   | { type: 'SEND_SUCCESS'; optimisticId: string; botMessages: NormalizedMessage[] }
   | { type: 'SEND_ERROR'; optimisticId: string; errorMessage: string }
+  | { type: 'CARD_ACTION_SUCCESS'; optimisticId: string; botMessages: NormalizedMessage[] }
   | { type: 'GLOBAL_ERROR'; error: string };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +79,20 @@ function reducer(state: State, action: Action): State {
             ? { ...m, status: 'error' as const, errorMessage: action.errorMessage }
             : m
         ),
+      };
+
+    case 'CARD_ACTION_SUCCESS':
+      return {
+        ...state,
+        isLoading: false,
+        messages: [
+          // Mark the optimistic card-submit chip as 'sent'
+          ...state.messages.map((m) =>
+            m.id === action.optimisticId ? { ...m, status: 'sent' as const } : m
+          ),
+          // Append all bot response messages with 'sent' status
+          ...action.botMessages.map((m) => ({ ...m, status: 'sent' as const })),
+        ],
       };
 
     case 'GLOBAL_ERROR':
@@ -233,11 +250,79 @@ export function useChatApi() {
     }
   }
 
+  /**
+   * Handles an Adaptive Card submit action (UI-07, UI-08, UI-10).
+   *
+   * - Dispatches an optimistic 'cardSubmit' chip bubble immediately
+   * - Shows skeleton loading after 300ms delay
+   * - Calls sendCardAction with retry
+   * - On success: marks chip as 'sent', appends bot response messages
+   * - On error: marks chip as 'error' with inline message
+   */
+  async function cardAction(
+    cardId: string,
+    userSummary: string,
+    submitData: Record<string, unknown>,
+  ): Promise<void> {
+    if (!state.conversationId) return;
+
+    // 1. Generate optimistic chip bubble
+    const optimisticId = crypto.randomUUID();
+    const optimisticMessage: TranscriptMessage = {
+      id: optimisticId,
+      role: 'user',
+      kind: 'text',
+      text: userSummary,
+      status: 'sending',
+      subKind: 'cardSubmit',
+    };
+
+    // 2. Dispatch chip immediately
+    dispatch({ type: 'ADD_OPTIMISTIC_MESSAGE', message: optimisticMessage });
+
+    // 3. Schedule skeleton after 300ms
+    const skeletonTimer = setTimeout(() => {
+      dispatch({ type: 'START_LOADING' });
+    }, SKELETON_DELAY_MS);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      // 4. Fetch with retry
+      const data = await fetchWithRetry(
+        (signal) =>
+          sendCardAction(state.conversationId!, cardId, userSummary, submitData, signal),
+        controller.signal,
+      );
+
+      clearTimeout(skeletonTimer);
+
+      dispatch({
+        type: 'CARD_ACTION_SUCCESS',
+        optimisticId,
+        botMessages: data.messages,
+      });
+    } catch (err) {
+      clearTimeout(skeletonTimer);
+      const error = err as Error;
+
+      if (error.name !== 'AbortError') {
+        dispatch({
+          type: 'SEND_ERROR',
+          optimisticId,
+          errorMessage: error.message || 'Failed to submit card. Please try again.',
+        });
+      }
+    }
+  }
+
   return {
     conversationId: state.conversationId,
     messages: state.messages,
     isLoading: state.isLoading,
     error: state.error,
     sendMessage: send,
+    cardAction,
   };
 }
