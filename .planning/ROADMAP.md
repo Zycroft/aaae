@@ -48,7 +48,11 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
   3. `client/.env.example` contains `VITE_AZURE_CLIENT_ID`, `VITE_AZURE_TENANT_NAME`, and `VITE_AZURE_REDIRECT_URI` entries with placeholder values
   4. When `AUTH_REQUIRED=true` and `AZURE_CLIENT_ID` is not set, the server refuses all requests (fails closed) at startup or on first request
   5. When `AUTH_REQUIRED=false`, the server starts and accepts requests without any Azure AD configuration present
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — UserClaims Zod schema in shared workspace (TDD)
+- [ ] 05-02-PLAN.md — Azure AD env vars in .env.examples + server config fail-closed logic
 
 ### Phase 6: Server JWT Validation + Org Allowlist
 **Goal**: The server validates real Entra External ID JWT tokens and blocks requests from disallowed tenants — authenticated requests reach the Copilot proxy; unauthenticated or disallowed requests are rejected with appropriate HTTP errors
@@ -82,6 +86,6 @@ Full phase details: `.planning/milestones/v1.1-ROADMAP.md`
 | 2. Text Chat End-to-End | v1.0 | 4/4 | Complete | 2026-02-20 |
 | 3. Adaptive Cards + Accessibility + Theming | v1.0 | 5/5 | Complete | 2026-02-20 |
 | 4. Polish, Metadata Drawer, CI, and Docs | v1.1 | 3/3 | Complete | 2026-02-20 |
-| 5. Shared Schema + Config Foundation | v1.2 | 0/TBD | Not started | - |
+| 5. Shared Schema + Config Foundation | v1.2 | 0/2 | Not started | - |
 | 6. Server JWT Validation + Org Allowlist | v1.2 | 0/TBD | Not started | - |
 | 7. Client MSAL Authentication | v1.2 | 0/TBD | Not started | - |
