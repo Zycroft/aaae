@@ -43,6 +43,10 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
 ### v1.3b — Copilot Studio SDK: Orchestrator Readiness (Phases 8–10)
 
 - [ ] **Phase 8: SDK Capability Audit + Structured Extraction** - Measure SDK latency baselines and extend the normalizer to extract structured JSON from all Copilot activity surfaces
+  Plans:
+  - [ ] 08-01-PLAN.md — ExtractedPayload schema in shared/ + NormalizedMessage extension
+  - [ ] 08-02-PLAN.md — TDD: normalizer extraction from activity.value, entities, bot text
+  - [ ] 08-03-PLAN.md — Latency baseline spike script + LATENCY-RESULTS.md
 - [ ] **Phase 9: Context Injection + Multi-Turn Validation** - Inject workflow context into outbound Copilot messages and verify conversation continuity across 3+ turns with a live agent
 - [ ] **Phase 10: Orchestrate Endpoint + Evaluation** - Deliver the /api/chat/orchestrate endpoint with WorkflowState types and produce the SDK-EVALUATION.md with GO/CONDITIONAL GO recommendation
 
@@ -58,7 +62,12 @@ Full phase details: `.planning/milestones/v1.2-ROADMAP.md`
   3. When Copilot embeds JSON in bot text, the normalizer parses it out and populates extractedPayload with confidence "low" or "medium"
   4. The ExtractedPayload Zod schema in shared/ validates all three extraction surfaces and rejects payloads missing required fields at runtime
   5. All pre-existing normalizer unit tests (text, card, hybrid) continue to pass after the extension
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — ExtractedPayload schema in shared/ + NormalizedMessage extension (Wave 1)
+- [ ] 08-02-PLAN.md — TDD: normalizer extraction from activity.value, entities, bot text (Wave 2)
+- [ ] 08-03-PLAN.md — Latency baseline spike script + LATENCY-RESULTS.md (Wave 1, has checkpoint)
 
 ### Phase 9: Context Injection + Multi-Turn Validation
 **Goal**: The server injects structured workflow context into outbound Copilot messages and a 3-turn live conversation confirms the agent reads context correctly and conversation state is not lost between turns
