@@ -82,3 +82,22 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.4 Persistent State Store (Shipped: 2026-02-22)
+
+**Phases completed:** 4 phases (11–14), 6 plans
+**Timeline:** 2026-02-21 → 2026-02-22 (1 day)
+**Git range:** 939a6d9 → 3c59adc
+**Files changed:** 51 files, 7,558 insertions, 619 deletions
+**Requirements:** 26/26 complete (RESIL-01 gap closed by Phase 14)
+
+**Key accomplishments:**
+1. StoredConversation Zod schema in shared/ with userId, tenantId, ISO timestamps, lifecycle status, and optional workflow fields — backward-compatible defaults for existing records via Zod .default() chains
+2. ConversationStore factory pattern — REDIS_URL drives Redis/InMemory selection with startup logging, no silent fallback, fail-hard on Redis unavailability
+3. RedisConversationStore with ioredis: TLS (rediss://), per-key TTL (24h default), commandTimeout (5s default), pipeline batching (atomic SET + ZADD + EXPIRE), sorted-set secondary index for user-scoped queries
+4. Health endpoint reports Redis status (connected/disconnected/not_configured) — three-state observability for operators; 14 unit tests via ioredis-mock
+5. Chat routes extract userId (oid) and tenantId (tid) from JWT claims; AUTH_REQUIRED=false uses STUB_USER fallback; /send and /card-action preserve fields via spread
+6. Redis error differentiation — isRedisError() utility detects redis-errors hierarchy by name + network error codes, route handlers return 503 for Redis failures vs 502 for Copilot Studio errors
+
+---
+

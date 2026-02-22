@@ -12,6 +12,8 @@ v1.2 (Auth) shipped 2026-02-21: Entra External ID (CIAM) authentication via MSAL
 
 v1.3b (Orchestrator Readiness) shipped 2026-02-21: Copilot Studio SDK validated for structured output extraction, context injection, and orchestrator infrastructure. ExtractedPayload schema with 3-surface priority extraction, WorkflowContext injection, POST /api/chat/orchestrate endpoint, and SDK-EVALUATION.md with CONDITIONAL GO for v1.5.
 
+v1.4 (Persistent State Store) shipped 2026-02-22: Redis-backed conversation persistence via ioredis with TLS, per-key TTL, sorted-set user index, and pipeline batching. StoredConversation schema with userId/tenantId/timestamps/status/workflow fields, factory pattern for Redis/InMemory selection, health endpoint Redis reporting, JWT claim integration in routes, and Redis error differentiation (503 vs 502). 91 tests, 26/26 requirements.
+
 ## Core Value
 
 Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
@@ -105,18 +107,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-## Current Milestone: v1.4 Persistent State Store (Azure Cache for Redis)
-
-**Goal:** Replace in-memory conversation store with Redis-backed persistent state, preparing the expanded data model for the Workflow Orchestrator (v1.5).
-
-**Target features:**
-- Redis-backed ConversationStore via ioredis with TLS, TTL, and timeouts
-- Expanded StoredConversation model (userId, tenantId, timestamps, status, workflow fields)
-- Store factory pattern: auto-select Redis vs InMemory based on REDIS_URL
-- User-scoped queries (listByUser) with sorted set secondary index
-- Health check endpoint reporting Redis connectivity
-- Graceful failure (503 when Redis unavailable, no silent fallback)
-- Chat routes populate new fields from JWT claims (v1.2)
+(No active milestone — v1.4 shipped. Start next with `/gsd:new-milestone`.)
 
 ### Out of Scope
 
@@ -205,4 +196,4 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | Name-based Redis error detection (err.name) over instanceof | ioredis v5 does not export TimeoutError; redis-errors package hierarchy detectable via error name | ✓ Good — more comprehensive, covers 7 error classes |
 
 ---
-*Last updated: 2026-02-22 after Phase 14 — v1.4 milestone complete*
+*Last updated: 2026-02-22 after v1.4 milestone*
