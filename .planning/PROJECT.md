@@ -107,7 +107,16 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-(No active milestone — v1.4 shipped. Start next with `/gsd:new-milestone`.)
+## Current Milestone: v1.5 Workflow Orchestrator + Structured Output Parsing
+
+**Goal:** Transform the Node server from a stateless proxy into a Workflow Orchestrator that sends enriched queries to Copilot, parses structured output (JSON schema) from responses, updates workflow state in Redis, and determines what to show the user next.
+
+**Target features:**
+- Structured Output Parser — extract structured signals (JSON data, flow actions, citations) from Copilot responses using multi-strategy parsing with Zod validation
+- Workflow Orchestrator — stateful service managing conversation flow: context enrichment, state accumulation, AI-driven next-step determination
+- Context Builder — enrich outbound Copilot queries with workflow state, collected data, and system constraints
+- Updated API Routes — evolve /start, /send, /card-action to return workflowState alongside messages
+- Backward Compatibility — passthrough mode when Copilot returns unstructured text (identical to v1.1 behavior)
 
 ### Out of Scope
 

@@ -5,15 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** Planning next milestone
+**Current focus:** v1.5 Workflow Orchestrator + Structured Output Parsing
 
 ## Current Position
 
-Phase: All complete through v1.4
-Status: v1.4 milestone archived, ready for next milestone
-Last activity: 2026-02-22 — v1.4 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-21 — Milestone v1.5 started
 
-Progress: [████████████████████] 14/14 phases complete (v1.0–v1.4 shipped)
+Progress: [░░░░░░░░░░░░░░░░░░░] 0/? phases (v1.5 in progress)
 
 ## Performance Metrics
 
@@ -62,7 +63,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-22
-Stopped at: v1.4 milestone archived
+Last session: 2026-02-21
+Stopped at: v1.5 milestone started — defining requirements
 Resume file: None
-Next step: /gsd:new-milestone
+Next step: Complete requirements and roadmap definition
