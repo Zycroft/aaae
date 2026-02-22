@@ -1,7 +1,15 @@
 import { Redis } from 'ioredis';
 import { InMemoryConversationStore } from './InMemoryStore.js';
 import { RedisConversationStore } from './RedisStore.js';
+import { RedisWorkflowStateStore } from './RedisWorkflowStateStore.js';
+import { InMemoryWorkflowStateStore } from './InMemoryWorkflowStateStore.js';
+import {
+  RedisConversationLock,
+  InMemoryConversationLock,
+} from '../lock/ConversationLock.js';
 import type { ConversationStore } from './ConversationStore.js';
+import type { WorkflowStateStore } from './WorkflowStateStore.js';
+import type { ConversationLock } from '../lock/ConversationLock.js';
 import { config } from '../config.js';
 
 /** The ioredis client instance — null when using InMemoryStore */
@@ -72,4 +80,45 @@ export function createConversationStore(): ConversationStore {
  */
 export function getRedisClient(): Redis | null {
   return redisClient;
+}
+
+/**
+ * createWorkflowStateStore — selects the active workflow state backend.
+ *
+ * Follows the same factory pattern as createConversationStore:
+ *   REDIS_URL set   → RedisWorkflowStateStore (persistent, 24h sliding TTL)
+ *   REDIS_URL absent → InMemoryWorkflowStateStore (LRU, local dev / CI)
+ *
+ * MUST be called AFTER createConversationStore (which initializes redisClient).
+ *
+ * ORCH-05
+ */
+export function createWorkflowStateStore(): WorkflowStateStore {
+  if (redisClient) {
+    console.log('[STORE] Redis detected. Using RedisWorkflowStateStore.');
+    return new RedisWorkflowStateStore(redisClient, config.REDIS_TTL);
+  }
+
+  console.log('[STORE] Using InMemoryWorkflowStateStore (local LRU).');
+  return new InMemoryWorkflowStateStore();
+}
+
+/**
+ * createConversationLock — selects the active lock backend.
+ *
+ *   REDIS_URL set   → RedisConversationLock (distributed, SET NX PX)
+ *   REDIS_URL absent → InMemoryConversationLock (process-local Set)
+ *
+ * MUST be called AFTER createConversationStore (which initializes redisClient).
+ *
+ * ORCH-07
+ */
+export function createConversationLock(): ConversationLock {
+  if (redisClient) {
+    console.log('[LOCK] Redis detected. Using RedisConversationLock.');
+    return new RedisConversationLock(redisClient);
+  }
+
+  console.log('[LOCK] Using InMemoryConversationLock.');
+  return new InMemoryConversationLock();
 }

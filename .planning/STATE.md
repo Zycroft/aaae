@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.5 — Phase 16: Workflow Orchestrator Engine
+**Current focus:** v1.5 — Phase 17: Route Integration + Compatibility
 
 ## Current Position
 
-Phase: 16 of 17 in v1.5 (Workflow Orchestrator Engine)
+Phase: 17 of 17 in v1.5 (Route Integration + Compatibility)
 Plan: 0 of ? in current phase
 Status: Ready to plan
-Last activity: 2026-02-22 — Phase 15 complete (3/3 plans, 8/8 requirements, verification passed)
+Last activity: 2026-02-22 — Phase 16 complete (3/3 plans, 7/7 requirements, all 142 tests passing)
 
-Progress: [███████████████░░░░] 15/17 phases complete (v1.5 in progress)
+Progress: [████████████████░░░] 16/17 phases complete (v1.5 in progress)
 
 ## Performance Metrics
 
 **v1.5 Velocity (in progress):**
-- Plans completed: 3 (Phase 15: 3)
+- Plans completed: 6 (Phase 15: 3, Phase 16: 3)
 - Timeline: 2026-02-22 (ongoing)
-- Requirements: 8/25 fulfilled (Phase 15: 8/8)
+- Requirements: 15/25 fulfilled (Phase 15: 8/8, Phase 16: 7/7)
 
 **v1.4 Velocity (complete):**
 - Plans completed: 6 (Phase 11: 2, Phase 12: 2, Phase 13: 1, Phase 14: 1)
@@ -50,6 +50,11 @@ Recent decisions affecting v1.5:
 - [v1.5-P15]: CopilotStructuredOutputSchema all fields optional with .passthrough() for forward compatibility
 - [v1.5-P15]: Parser operates on NormalizedMessage[] (post-normalization), not raw Activity[]
 - [v1.5-P15]: Context builder default maxLength 2000 chars, configurable preamble template
+- [v1.5-P16]: Redis SET NX PX for per-conversation distributed locks with Lua release
+- [v1.5-P16]: 10s default lock TTL (2x conservative Copilot P99 latency estimate)
+- [v1.5-P16]: WorkflowOrchestrator uses DI constructor for full testability
+- [v1.5-P16]: Rollback-on-failure: state only saved at end of successful turn
+- [v1.5-P16]: ACTION_TO_STEP mapping for workflow progression (ask->gather_info, etc.)
 
 ### Pending Todos
 
@@ -60,11 +65,11 @@ None.
 - ESLint missing @react-eslint plugin — pre-existing tech debt, non-blocking
 - 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt, non-blocking
 - Phase 15: COMPLETE — CopilotStructuredOutputSchema format locked, parser + context builder shipped
-- Phase 16: Lock TTL must be measured against actual Copilot P99 latency; research assumes 2-3s → set TTL to 5s conservatively
+- Phase 16: COMPLETE — WorkflowOrchestrator service with Redis state, locking, context enrichment
 
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Phase 15 verified and complete. Ready for Phase 16 planning.
+Stopped at: Phase 16 verified and complete. Ready for Phase 17 planning.
 Resume file: None
-Next step: `/gsd:plan-phase 16`
+Next step: `/gsd:plan-phase 17`

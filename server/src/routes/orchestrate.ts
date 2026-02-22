@@ -102,6 +102,7 @@ orchestrateRouter.post('/', async (req, res) => {
         ? JSON.stringify(extractedPayload.data)
         : existingState?.lastRecommendation,
       turnCount: (existingState?.turnCount ?? 0) + 1,
+      status: existingState?.status ?? 'active',
     };
     await workflowStateStore.set(conversationId, workflowState);
 

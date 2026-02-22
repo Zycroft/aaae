@@ -70,7 +70,7 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
 **Milestone Goal:** Transform the Node server from a stateless proxy into a Workflow Orchestrator that parses structured output from Copilot responses, maintains per-conversation workflow state in Redis, enriches outbound queries with accumulated context, and routes all existing endpoints through the orchestrator — while preserving passthrough behavior when Copilot returns unstructured text.
 
 - [x] **Phase 15: Parser + Context Builder** - Shared schemas, multi-strategy structured output parser, and configurable context builder — completed 2026-02-22
-- [ ] **Phase 16: Workflow Orchestrator Engine** - Stateful orchestration service with Redis persistence, per-conversation locking, and context accumulation
+- [x] **Phase 16: Workflow Orchestrator Engine** - Stateful orchestration service with Redis persistence, per-conversation locking, and context accumulation — completed 2026-02-22
 - [ ] **Phase 17: Route Integration + Compatibility** - Wire orchestrator into all chat routes, update API schemas, validate backward compatibility, and ship integration tests
 
 ## Phase Details
@@ -105,9 +105,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 16-01-PLAN.md — TDD: RedisWorkflowStateStore with 24h sliding TTL + ConversationLock with SET NX PX
-- [ ] 16-02-PLAN.md — WorkflowResponse types, orchestrator config, and workflow step definitions
-- [ ] 16-03-PLAN.md — TDD: WorkflowOrchestrator service class (full per-turn loop with DI)
+- [x] 16-01-PLAN.md — TDD: RedisWorkflowStateStore with 24h sliding TTL + ConversationLock with SET NX PX
+- [x] 16-02-PLAN.md — WorkflowResponse types, orchestrator config, and workflow step definitions
+- [x] 16-03-PLAN.md — TDD: WorkflowOrchestrator service class (full per-turn loop with DI)
 
 ### Phase 17: Route Integration + Compatibility
 **Goal**: All three chat routes (/start, /send, /card-action) delegate to the orchestrator and return workflowState in their responses, while existing chat behavior is fully preserved when no structured output is present
@@ -119,7 +119,12 @@ Plans:
   3. A client that sends no workflowContext and receives unstructured Copilot responses observes zero behavior change from v1.4 (identical message content, status codes, and error shapes)
   4. The parser unit test suite covers JSON code block extraction, text-only passthrough, hybrid responses, and malformed input without any test throwing
   5. A multi-turn integration test demonstrates that collectedData accumulates across three or more turns and appears in successive Copilot query preambles
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — Extend shared API response schemas with optional workflowState field
+- [ ] 17-02-PLAN.md — Rewrite chat.ts routes to delegate to orchestrator singleton
+- [ ] 17-03-PLAN.md — TDD: Multi-turn orchestrator integration test (data accumulation across 3+ turns)
 
 ## Progress
 
@@ -140,5 +145,5 @@ Plans:
 | 13. Route Integration + Tests | v1.4 | 1/1 | Complete | 2026-02-22 |
 | 14. Redis Error Differentiation | v1.4 | 1/1 | Complete | 2026-02-22 |
 | 15. Parser + Context Builder | v1.5 | 3/3 | Complete | 2026-02-22 |
-| 16. Workflow Orchestrator Engine | v1.5 | 0/3 | Planned | - |
-| 17. Route Integration + Compatibility | v1.5 | 0/? | Not started | - |
+| 16. Workflow Orchestrator Engine | v1.5 | 3/3 | Complete | 2026-02-22 |
+| 17. Route Integration + Compatibility | v1.5 | 0/3 | Not started | - |

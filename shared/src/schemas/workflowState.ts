@@ -18,6 +18,14 @@ export const WorkflowStateSchema = z.object({
   lastRecommendation: z.string().optional(),
   /** Number of orchestrate calls for this conversation (non-negative integer) */
   turnCount: z.number().int().nonnegative(),
+  /** Workflow lifecycle status — default 'active' for backward compatibility (ORCH-01) */
+  status: z.enum(['active', 'completed', 'error']).default('active'),
+  /** Maps to the step from WorkflowDefinition — used for progress tracking */
+  currentPhase: z.string().optional(),
+  /** User identifier — scoping field for ORCH-01 */
+  userId: z.string().optional(),
+  /** Tenant identifier — scoping field for ORCH-01 */
+  tenantId: z.string().optional(),
 });
 
 export type WorkflowState = z.infer<typeof WorkflowStateSchema>;
