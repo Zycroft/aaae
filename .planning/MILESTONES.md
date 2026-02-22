@@ -101,3 +101,22 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.5 Workflow Orchestrator + Structured Output Parsing (Shipped: 2026-02-22)
+
+**Phases completed:** 4 phases (15–18), 11 plans
+**Timeline:** 2026-02-22 (1 day)
+**Files changed:** 22 files, 2,744 insertions, 136 deletions
+**Lines of code:** ~7,202 TypeScript (cumulative)
+**Requirements:** 25/25 complete
+
+**Key accomplishments:**
+1. Multi-strategy structured output parser (parseTurn) — extracts JSON from activity.value, entities, or text code blocks with Zod validation + .passthrough() for forward compatibility; never throws on malformed input
+2. Configurable context builder (buildContextualQuery) — prepends workflow state preamble to Copilot queries with step, collected data, and turn number; max-length truncation at 2000 chars default
+3. Redis-backed workflow state store with 24h sliding TTL + per-conversation distributed locking (SET NX PX + Lua CAS release) preventing race conditions on concurrent requests
+4. WorkflowOrchestrator service — full per-turn loop (load state → enrich query → Copilot call → normalize → parse → update state → save) with DI constructor for testability and rollback-on-failure semantics
+5. Route integration for /start, /send, /card-action — all three endpoints delegate to orchestrator singleton; responses include optional workflowState field; backward compatibility preserved for unstructured Copilot responses
+6. 147 tests passing across parser (15), context builder (10), store (7), lock (9), orchestrator (10), integration (5), plus all pre-existing tests — zero regressions
+
+---
+

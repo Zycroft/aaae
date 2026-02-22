@@ -14,6 +14,8 @@ v1.3b (Orchestrator Readiness) shipped 2026-02-21: Copilot Studio SDK validated 
 
 v1.4 (Persistent State Store) shipped 2026-02-22: Redis-backed conversation persistence via ioredis with TLS, per-key TTL, sorted-set user index, and pipeline batching. StoredConversation schema with userId/tenantId/timestamps/status/workflow fields, factory pattern for Redis/InMemory selection, health endpoint Redis reporting, JWT claim integration in routes, and Redis error differentiation (503 vs 502). 91 tests, 26/26 requirements.
 
+v1.5 (Workflow Orchestrator + Structured Output Parsing) shipped 2026-02-22: Structured output parser with multi-strategy extraction and Zod validation (.passthrough() for forward compatibility), configurable context builder with max-length truncation, WorkflowOrchestrator service with Redis state persistence (24h sliding TTL), per-conversation locking (SET NX PX + Lua release), context accumulation across turns, ACTION_TO_STEP workflow progression, route integration for all three chat endpoints, backward compatibility preserved for unstructured responses. 147 tests, 25/25 requirements.
+
 ## Core Value
 
 Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
@@ -105,18 +107,16 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ Route handlers return 503 for Redis errors vs 502 for Copilot Studio errors (isRedisError utility) — v1.4 Phase 14
 - ✓ isRedisError() detects redis-errors hierarchy by name + network error codes (16 test cases) — v1.4 Phase 14
 
+- ✓ Multi-strategy structured output parser with Zod validation + .passthrough() forward compatibility — v1.5
+- ✓ Configurable context builder with preamble template and max-length truncation — v1.5
+- ✓ Redis-backed workflow state store with 24h sliding TTL and per-conversation distributed locking — v1.5
+- ✓ WorkflowOrchestrator service with full per-turn loop and DI constructor — v1.5
+- ✓ All three chat routes delegate to orchestrator with backward-compatible workflowState field — v1.5
+- ✓ 147 tests passing, 25/25 v1.5 requirements verified — v1.5
+
 ### Active
 
-## Current Milestone: v1.5 Workflow Orchestrator + Structured Output Parsing
-
-**Goal:** Transform the Node server from a stateless proxy into a Workflow Orchestrator that sends enriched queries to Copilot, parses structured output (JSON schema) from responses, updates workflow state in Redis, and determines what to show the user next.
-
-**Target features:**
-- Structured Output Parser — extract structured signals (JSON data, flow actions, citations) from Copilot responses using multi-strategy parsing with Zod validation
-- Workflow Orchestrator — stateful service managing conversation flow: context enrichment, state accumulation, AI-driven next-step determination
-- Context Builder — enrich outbound Copilot queries with workflow state, collected data, and system constraints
-- Updated API Routes — evolve /start, /send, /card-action to return workflowState alongside messages
-- Backward Compatibility — passthrough mode when Copilot returns unstructured text (identical to v1.1 behavior)
+(No active milestone — run `/gsd:new-milestone` to start next)
 
 ### Out of Scope
 
@@ -132,7 +132,11 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
+<<<<<<< HEAD
 **Current state (v1.5 Phase 15 complete):** 15 phases, 41 plans shipped across 5 milestones (v1.0–v1.4) + Phase 15 of v1.5. Structured output parser and context builder shipped: CopilotStructuredOutputSchema with .passthrough() for forward compatibility, parseTurn() with non-throwing contract (ParsedTurn discriminated union), buildContextualQuery() with configurable preamble and max-length truncation. 116 unit tests across 9 test files.
+=======
+**Current state (v1.5 shipped):** 18 phases, 50 plans shipped across 6 milestones (v1.0–v1.5). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, and workflow orchestration. 147 tests, all passing.
+>>>>>>> gsd/phase-18-phase16-verification-closure
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -142,9 +146,10 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - Auth: Entra External ID (CIAM) via @azure/msal-browser + @azure/msal-react
 - Adaptive Cards: `adaptivecards` v3 JS SDK with custom React wrapper (not `adaptivecards-react`)
 
-**Tech debt carried into next milestone:**
+**Tech debt carried forward:**
 - Missing VERIFICATION.md for Phases 1 & 3 (all code verified functionally; documentation gap only)
 - ESLint JSX plugin missing — non-blocking, 3 pre-existing errors in AdaptiveCardMessage.tsx and ChatInput.tsx
+- Context builder maxLength 2000 chars default — needs live validation with real Copilot workloads
 
 ## Constraints
 
@@ -206,8 +211,16 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | CopilotStructuredOutputSchema all fields optional + .passthrough() | Forward compatibility — Copilot responses may evolve, unknown fields should not break validation | ✓ Good — allows schema evolution without code changes |
 | Parser operates on NormalizedMessage[] not raw Activity[] | Reuse extractedPayload from activityNormalizer rather than re-extracting | ✓ Good — single responsibility, avoids redundant extraction |
 | ParsedTurn three-kind discriminated union (structured/passthrough/parse_error) | Distinguish "no data found" from "data found but invalid" — enables observability | ✓ Good — orchestrator can route decisions based on kind |
+<<<<<<< HEAD
 | Context builder default maxLength 2000 chars | Conservative estimate for Copilot token budget; configurable for tuning | TBD — Phase 18 observability will validate |
 | String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
 
 ---
 *Last updated: 2026-02-22 after Phase 15*
+=======
+| Context builder default maxLength 2000 chars | Conservative estimate for Copilot token budget; configurable for tuning | TBD — needs live validation |
+| String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
+
+---
+*Last updated: 2026-02-22 after v1.5 milestone*
+>>>>>>> gsd/phase-18-phase16-verification-closure
