@@ -77,7 +77,11 @@ Full phase details: `.planning/milestones/v1.3b-ROADMAP.md`
   4. ConversationStore interface exposes a listByUser(userId) method that both InMemory and Redis implementations satisfy
   5. REDIS_URL absent at startup selects InMemoryStore; REDIS_URL present selects RedisStore (verified by the factory's own logic, not yet by a live Redis)
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — StoredConversation Zod schema in shared/ with backward-compatible defaults (STATE-01 through STATE-06)
+- [ ] 11-02-PLAN.md — Server store abstraction: ConversationStore interface + InMemoryStore update + RedisStore stub + factory + index singleton (STORE-01 through STORE-04, QUERY-01)
 
 ### Phase 12: Redis Implementation + Resilience
 
