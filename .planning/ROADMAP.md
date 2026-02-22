@@ -85,7 +85,12 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
   3. A malformed or unparseable Copilot response produces a ParsedTurn where parseErrors contains the failure reason and the parser does not throw
   4. The context builder prepends a preamble to Copilot queries that includes current step, collected data summary, and turn number — and the preamble is truncated to the configured max length when it exceeds the limit
   5. CopilotStructuredOutputSchema and ParsedTurn types are defined in shared/src/schemas/workflow.ts and importable from both server and (type-only) client
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Shared workflow schemas (CopilotStructuredOutputSchema, ParsedTurn, NextAction) in shared/src/schemas/workflow.ts
+- [ ] 15-02-PLAN.md — TDD: Structured output parser (parseTurn, multi-strategy extraction + Zod validation)
+- [ ] 15-03-PLAN.md — TDD: Context builder (buildContextualQuery, configurable preamble + max-length truncation)
 
 ### Phase 16: Workflow Orchestrator Engine
 **Goal**: A WorkflowOrchestrator service manages the full per-turn loop (load state, enrich query, call Copilot, normalize, parse, update state, save) with atomic Redis state persistence and per-conversation sequential processing
