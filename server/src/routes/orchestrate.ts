@@ -5,13 +5,31 @@ import { ActivityTypes } from '@microsoft/agents-activity';
 import {
   OrchestrateRequestSchema,
   type WorkflowState,
+  type WorkflowContext,
   type ExtractedPayload,
 } from '@copilot-chat/shared';
 import { copilotClient } from '../copilot.js';
 import { conversationStore, workflowStateStore } from '../store/index.js';
 import { normalizeActivities } from '../normalizer/activityNormalizer.js';
-import { buildContextPrefix } from './chat.js';
 import { isRedisError } from '../utils/errorDetection.js';
+
+/**
+ * Builds a structured context prefix for Copilot messages.
+ * When workflowContext is provided, this prefix is prepended to the user's message
+ * so the Copilot agent receives workflow state alongside the query.
+ *
+ * Inlined here after buildContextPrefix was removed from chat.ts in Phase 17 Plan 02.
+ * CTX-02
+ */
+function buildContextPrefix(ctx: WorkflowContext): string {
+  return (
+    `[WORKFLOW_CONTEXT]\n` +
+    `step: ${ctx.step}\n` +
+    `constraints: ${ctx.constraints?.join(' | ') ?? 'none'}\n` +
+    `data: ${JSON.stringify(ctx.collectedData ?? {})}\n` +
+    `[/WORKFLOW_CONTEXT]\n\n`
+  );
+}
 
 export const orchestrateRouter = Router();
 

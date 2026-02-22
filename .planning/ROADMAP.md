@@ -7,7 +7,7 @@
 - ✅ **v1.2 Auth** — Phases 5–7 (shipped 2026-02-21)
 - ✅ **v1.3b Copilot Studio SDK: Orchestrator Readiness** — Phases 8–10 (shipped 2026-02-21)
 - ✅ **v1.4 Persistent State Store** — Phases 11–14 (shipped 2026-02-22)
-- 🚧 **v1.5 Workflow Orchestrator + Structured Output Parsing** — Phases 15–17 (in progress)
+- 🚧 **v1.5 Workflow Orchestrator + Structured Output Parsing** — Phases 15–18 (in progress)
 
 ## Phases
 
@@ -71,7 +71,11 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
 
 - [x] **Phase 15: Parser + Context Builder** - Shared schemas, multi-strategy structured output parser, and configurable context builder — completed 2026-02-22
 - [x] **Phase 16: Workflow Orchestrator Engine** - Stateful orchestration service with Redis persistence, per-conversation locking, and context accumulation — completed 2026-02-22
+<<<<<<< HEAD
 - [ ] **Phase 17: Route Integration + Compatibility** - Wire orchestrator into all chat routes, update API schemas, validate backward compatibility, and ship integration tests
+=======
+- [x] **Phase 17: Route Integration + Compatibility** - Wire orchestrator into all chat routes, update API schemas, validate backward compatibility, and ship integration tests (completed 2026-02-22)
+>>>>>>> gsd/phase-17-route-integration-compatibility
 
 ## Phase Details
 
@@ -122,9 +126,30 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
+<<<<<<< HEAD
 - [ ] 17-01-PLAN.md — Extend shared API response schemas with optional workflowState field
 - [ ] 17-02-PLAN.md — Rewrite chat.ts routes to delegate to orchestrator singleton
 - [ ] 17-03-PLAN.md — TDD: Multi-turn orchestrator integration test (data accumulation across 3+ turns)
+=======
+- [x] 17-01-PLAN.md — Extend shared API response schemas with optional workflowState field
+- [x] 17-02-PLAN.md — Rewrite chat.ts routes to delegate to orchestrator singleton
+- [x] 17-03-PLAN.md — TDD: Multi-turn orchestrator integration test (data accumulation across 3+ turns)
+
+### Phase 18: Phase 16 Verification + Requirement Closure
+**Goal**: Produce the missing Phase 16 VERIFICATION.md and close all 7 ORCH requirement checkboxes so the milestone audit passes
+**Depends on**: Phase 17 (all code complete, gap is process-level only)
+**Requirements**: ORCH-01, ORCH-02, ORCH-03, ORCH-04, ORCH-05, ORCH-06, ORCH-07
+**Gap Closure:** Closes all 7 partial requirement gaps from v1.5 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 16 has a VERIFICATION.md that confirms all 7 ORCH requirements are satisfied
+  2. REQUIREMENTS.md checkboxes for ORCH-01–07 are checked and status is Complete
+  3. Re-audit of v1.5 milestone shows 25/25 requirements satisfied
+**Plans**: 2 plans
+
+Plans:
+- [ ] 18-01-PLAN.md — Run Phase 16 verification to produce VERIFICATION.md
+- [ ] 18-02-PLAN.md — Update REQUIREMENTS.md traceability (checkboxes + status) for ORCH-01–07
+>>>>>>> gsd/phase-17-route-integration-compatibility
 
 ## Progress
 
@@ -146,4 +171,9 @@ Plans:
 | 14. Redis Error Differentiation | v1.4 | 1/1 | Complete | 2026-02-22 |
 | 15. Parser + Context Builder | v1.5 | 3/3 | Complete | 2026-02-22 |
 | 16. Workflow Orchestrator Engine | v1.5 | 3/3 | Complete | 2026-02-22 |
+<<<<<<< HEAD
 | 17. Route Integration + Compatibility | v1.5 | 0/3 | Not started | - |
+=======
+| 17. Route Integration + Compatibility | v1.5 | 3/3 | Complete | 2026-02-22 |
+| 18. Phase 16 Verification + Requirement Closure | v1.5 | 0/2 | Pending | - |
+>>>>>>> gsd/phase-17-route-integration-compatibility

@@ -17,6 +17,7 @@ import { WorkflowStateSchema } from './workflowState.js';
 
 export const StartConversationResponseSchema = z.object({
   conversationId: z.string().uuid(),
+  workflowState: WorkflowStateSchema.optional(),
 });
 
 export type StartConversationResponse = z.infer<typeof StartConversationResponseSchema>;
@@ -36,6 +37,7 @@ export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
 export const SendMessageResponseSchema = z.object({
   conversationId: z.string().uuid(),
   messages: z.array(NormalizedMessageSchema),
+  workflowState: WorkflowStateSchema.optional(),
 });
 
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
@@ -58,6 +60,7 @@ export type CardActionRequest = z.infer<typeof CardActionRequestSchema>;
 export const CardActionResponseSchema = z.object({
   conversationId: z.string().uuid(),
   messages: z.array(NormalizedMessageSchema),
+  workflowState: WorkflowStateSchema.optional(),
 });
 
 export type CardActionResponse = z.infer<typeof CardActionResponseSchema>;

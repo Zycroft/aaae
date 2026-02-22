@@ -1,74 +1,34 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { Activity } from '@microsoft/agents-activity';
-import { ActivityTypes } from '@microsoft/agents-activity';
 import {
   SendMessageRequestSchema,
   CardActionRequestSchema,
-  type WorkflowContext,
 } from '@copilot-chat/shared';
 import { validateCardAction } from '../allowlist/cardActionAllowlist.js';
-import { copilotClient } from '../copilot.js';
-import { conversationStore } from '../store/index.js';
-import { normalizeActivities } from '../normalizer/activityNormalizer.js';
 import { isRedisError } from '../utils/errorDetection.js';
-
-/**
- * Builds a structured context prefix for Copilot messages.
- * When workflowContext is provided, this prefix is prepended to the user's message
- * so the Copilot agent receives workflow state alongside the query.
- *
- * CTX-02
- */
-export function buildContextPrefix(ctx: WorkflowContext): string {
-  return (
-    `[WORKFLOW_CONTEXT]\n` +
-    `step: ${ctx.step}\n` +
-    `constraints: ${ctx.constraints?.join(' | ') ?? 'none'}\n` +
-    `data: ${JSON.stringify(ctx.collectedData ?? {})}\n` +
-    `[/WORKFLOW_CONTEXT]\n\n`
-  );
-}
+import { orchestrator } from '../orchestrator/index.js';
 
 export const chatRouter = Router();
 
 /**
  * POST /api/chat/start
- * Starts a new Copilot Studio conversation.
- * Returns: { conversationId: string } — a server-generated UUID.
+ * Starts a new Copilot Studio conversation via the WorkflowOrchestrator.
+ * Returns: { conversationId: string, workflowState: WorkflowState }
  *
- * The Copilot SDK's internal conversation state is captured via the streaming
- * generator and stored in ConversationStore alongside the external UUID.
+ * The orchestrator creates initial workflow state, starts the Copilot conversation,
+ * and persists the conversation record.
  *
- * Note: With stub credentials, this endpoint returns 502 (Copilot Studio rejects
- * the stub token). With real credentials, returns 200 { conversationId }.
- *
- * SERV-02
+ * SERV-02, ROUTE-01
  */
 chatRouter.post('/start', async (req, res) => {
   try {
-    const externalId = uuidv4(); // The conversationId we return to clients
-    const collectedActivities: Activity[] = [];
-
-    // startConversationStreaming returns AsyncGenerator<Activity> — NOT a Promise.
-    // Must use for-await-of to consume it.
-    for await (const activity of copilotClient.startConversationStreaming(true)) {
-      collectedActivities.push(activity);
-    }
-
-    const now = new Date().toISOString();
-    await conversationStore.set(externalId, {
-      externalId,
-      sdkConversationRef: collectedActivities, // Store raw activities for Phase 2 normalizer
-      history: [], // Message history populated in Phase 2
+    const conversationId = uuidv4();
+    const workflowState = await orchestrator.startSession({
+      conversationId,
       userId: req.user?.oid ?? 'anonymous',
       tenantId: req.user?.tid ?? 'dev',
-      createdAt: now,
-      updatedAt: now,
-      status: 'active',
     });
-
-    res.status(200).json({ conversationId: externalId });
+    res.status(200).json({ conversationId, workflowState });
   } catch (err) {
     console.error('[chat/start] Error starting conversation:', err);
     if (isRedisError(err)) {
@@ -81,60 +41,35 @@ chatRouter.post('/start', async (req, res) => {
 
 /**
  * POST /api/chat/send
- * Sends a user message to Copilot Studio and returns the bot's normalized response.
- * Request: { conversationId: string, text: string }
- * Returns: { conversationId: string, messages: NormalizedMessage[] }
+ * Sends a user message to Copilot Studio via the WorkflowOrchestrator.
+ * Request: { conversationId: string, text: string, workflowContext?: WorkflowContext }
+ * Returns: { conversationId: string, messages: NormalizedMessage[], workflowState: WorkflowState }
  *
- * Uses the singleton copilotClient (which retains the internal Copilot conversation ID
- * from the last startConversationStreaming call — Phase 2 single-conversation approach).
+ * Note: workflowContext in the request body is accepted for backward compatibility but
+ * ignored — the orchestrator enriches queries from its own stored WorkflowState.
  *
- * SERV-03
+ * SERV-03, ROUTE-02, COMPAT-01
  */
 chatRouter.post('/send', async (req, res) => {
-  // 1. Validate request body
   const parsed = SendMessageRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid request', details: parsed.error.format() });
     return;
   }
-  const { conversationId, text, workflowContext } = parsed.data;
-
-  // 2. Look up conversation
-  const conversation = await conversationStore.get(conversationId);
-  if (!conversation) {
-    res.status(404).json({ error: 'Conversation not found' });
-    return;
-  }
+  const { conversationId, text } = parsed.data;
 
   try {
-    // 3. Build message activity — prepend context prefix if workflowContext provided
-    const outboundText = workflowContext
-      ? buildContextPrefix(workflowContext) + text
-      : text;
-
-    const userActivity: Activity = {
-      type: ActivityTypes.Message,
-      text: outboundText,
-    } as Activity;
-
-    // 4. Call sendActivityStreaming — no conversationId arg; singleton uses its stored internal ID
-    const collectedActivities: Activity[] = [];
-    for await (const activity of copilotClient.sendActivityStreaming(userActivity)) {
-      collectedActivities.push(activity);
-    }
-
-    // 5. Normalize activities to NormalizedMessage[]
-    const messages = normalizeActivities(collectedActivities);
-
-    // 6. Update conversation history in store
-    await conversationStore.set(conversationId, {
-      ...conversation,
-      history: [...conversation.history, ...messages],
-      updatedAt: new Date().toISOString(),
+    const workflowResponse = await orchestrator.processTurn({
+      conversationId,
+      text,
+      userId: req.user?.oid ?? 'anonymous',
+      tenantId: req.user?.tid ?? 'dev',
     });
-
-    // 7. Return response
-    res.status(200).json({ conversationId, messages });
+    res.status(200).json({
+      conversationId: workflowResponse.conversationId,
+      messages: workflowResponse.messages,
+      workflowState: workflowResponse.workflowState,
+    });
   } catch (err) {
     console.error('[chat/send] Error sending message:', err);
     if (isRedisError(err)) {
@@ -147,18 +82,17 @@ chatRouter.post('/send', async (req, res) => {
 
 /**
  * POST /api/chat/card-action
- * Validates and forwards an Adaptive Card submit action to Copilot Studio.
+ * Validates and forwards an Adaptive Card submit action via the WorkflowOrchestrator.
  * Request: { conversationId, cardId, userSummary, submitData }
- * Returns: { conversationId: string, messages: NormalizedMessage[] }
+ * Returns: { conversationId: string, messages: NormalizedMessage[], workflowState: WorkflowState }
  *
  * Enforces:
- *   SERV-07: Action type allowlist (rejects disallowed types with 403)
- *   SERV-08: Action.OpenUrl domain allowlist (rejects disallowed domains with 403)
+ *   SERV-07: Action type allowlist (rejects disallowed types with 403) — BEFORE orchestrator
+ *   SERV-08: Action.OpenUrl domain allowlist (rejects disallowed domains with 403) — BEFORE orchestrator
  *
- * SERV-04
+ * SERV-04, ROUTE-03, COMPAT-02
  */
 chatRouter.post('/card-action', async (req, res) => {
-  // 1. Validate request body shape
   const parsed = CardActionRequestSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid request', details: parsed.error.format() });
@@ -166,7 +100,7 @@ chatRouter.post('/card-action', async (req, res) => {
   }
   const { conversationId, cardId, userSummary, submitData } = parsed.data;
 
-  // 2. Validate action against allowlist BEFORE any Copilot call (SERV-07, SERV-08)
+  // COMPAT-02: Allowlist validation BEFORE orchestrator — preserve 403 contract
   const allowlistResult = validateCardAction(submitData);
   if (!allowlistResult.ok) {
     console.warn(`[chat/card-action] Rejected: ${allowlistResult.reason}`);
@@ -174,39 +108,20 @@ chatRouter.post('/card-action', async (req, res) => {
     return;
   }
 
-  // 3. Look up conversation
-  const conversation = await conversationStore.get(conversationId);
-  if (!conversation) {
-    res.status(404).json({ error: 'Conversation not found' });
-    return;
-  }
-
   try {
-    // 4. Build card action activity — userSummary as the text, submitData as the value
-    const cardActivity: Activity = {
-      type: ActivityTypes.Message,
-      text: userSummary,
-      value: { ...submitData, cardId },
-    } as Activity;
-
-    // 5. Forward to Copilot Studio
-    const collectedActivities: Activity[] = [];
-    for await (const activity of copilotClient.sendActivityStreaming(cardActivity)) {
-      collectedActivities.push(activity);
-    }
-
-    // 6. Normalize to NormalizedMessage[]
-    const messages = normalizeActivities(collectedActivities);
-
-    // 7. Update conversation history
-    await conversationStore.set(conversationId, {
-      ...conversation,
-      history: [...conversation.history, ...messages],
-      updatedAt: new Date().toISOString(),
+    const workflowResponse = await orchestrator.processCardAction({
+      conversationId,
+      cardId,
+      userSummary,
+      submitData,
+      userId: req.user?.oid ?? 'anonymous',
+      tenantId: req.user?.tid ?? 'dev',
     });
-
-    // 8. Return normalized messages
-    res.status(200).json({ conversationId, messages });
+    res.status(200).json({
+      conversationId: workflowResponse.conversationId,
+      messages: workflowResponse.messages,
+      workflowState: workflowResponse.workflowState,
+    });
   } catch (err) {
     console.error('[chat/card-action] Error forwarding card action:', err);
     if (isRedisError(err)) {

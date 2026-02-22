@@ -33,22 +33,22 @@ Requirements for v1.5 Workflow Orchestrator + Structured Output Parsing.
 
 ### Route Updates
 
-- [ ] **ROUTE-01**: POST /api/chat/start delegates to orchestrator and returns workflowState in response
-- [ ] **ROUTE-02**: POST /api/chat/send delegates to orchestrator and returns workflowState in response
-- [ ] **ROUTE-03**: POST /api/chat/card-action validates allowlist then delegates to orchestrator and returns workflowState in response
-- [ ] **ROUTE-04**: Shared API response schemas updated to include optional workflowState field
+- [x] **ROUTE-01**: POST /api/chat/start delegates to orchestrator and returns workflowState in response
+- [x] **ROUTE-02**: POST /api/chat/send delegates to orchestrator and returns workflowState in response
+- [x] **ROUTE-03**: POST /api/chat/card-action validates allowlist then delegates to orchestrator and returns workflowState in response
+- [x] **ROUTE-04**: Shared API response schemas updated to include optional workflowState field
 
 ### Backward Compatibility
 
-- [ ] **COMPAT-01**: When Copilot returns unstructured text (no parseable data), behavior is identical to v1.1 (passthrough mode)
-- [ ] **COMPAT-02**: Existing card action allowlist validation runs before orchestrator processing
-- [ ] **COMPAT-03**: No regression in existing chat functionality (text chat, Adaptive Cards, authentication)
+- [x] **COMPAT-01**: When Copilot returns unstructured text (no parseable data), behavior is identical to v1.1 (passthrough mode)
+- [x] **COMPAT-02**: Existing card action allowlist validation runs before orchestrator processing
+- [x] **COMPAT-03**: No regression in existing chat functionality (text chat, Adaptive Cards, authentication)
 
 ### Testing
 
-- [ ] **TEST-01**: Unit tests for structured output parser covering JSON code blocks, text-only, hybrid, and malformed response formats
-- [ ] **TEST-02**: Unit tests for context builder verifying preamble format with various state shapes and max-length truncation
-- [ ] **TEST-03**: Integration test for multi-turn workflow demonstrating data accumulation across turns
+- [x] **TEST-01**: Unit tests for structured output parser covering JSON code blocks, text-only, hybrid, and malformed response formats
+- [x] **TEST-02**: Unit tests for context builder verifying preamble format with various state shapes and max-length truncation
+- [x] **TEST-03**: Integration test for multi-turn workflow demonstrating data accumulation across turns
 
 ## v2 Requirements
 
@@ -98,6 +98,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CTX-01 | Phase 15 | Complete |
 | CTX-02 | Phase 15 | Complete |
 | CTX-03 | Phase 15 | Complete |
+<<<<<<< HEAD
 | ORCH-01 | Phase 16 | Pending |
 | ORCH-02 | Phase 16 | Pending |
 | ORCH-03 | Phase 16 | Pending |
@@ -115,6 +116,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 17 | Pending |
 | TEST-02 | Phase 17 | Pending |
 | TEST-03 | Phase 17 | Pending |
+=======
+| ORCH-01 | Phase 16 → 18 | Pending |
+| ORCH-02 | Phase 16 → 18 | Pending |
+| ORCH-03 | Phase 16 → 18 | Pending |
+| ORCH-04 | Phase 16 → 18 | Pending |
+| ORCH-05 | Phase 16 → 18 | Pending |
+| ORCH-06 | Phase 16 → 18 | Pending |
+| ORCH-07 | Phase 16 → 18 | Pending |
+| ROUTE-01 | Phase 17 | Complete |
+| ROUTE-02 | Phase 17 | Complete |
+| ROUTE-03 | Phase 17 | Complete |
+| ROUTE-04 | Phase 17 | Complete |
+| COMPAT-01 | Phase 17 | Complete |
+| COMPAT-02 | Phase 17 | Complete |
+| COMPAT-03 | Phase 17 | Complete |
+| TEST-01 | Phase 17 | Complete |
+| TEST-02 | Phase 17 | Complete |
+| TEST-03 | Phase 17 | Complete |
+>>>>>>> gsd/phase-17-route-integration-compatibility
 
 **Coverage:**
 - v1.5 requirements: 25 total
@@ -123,4 +143,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-22 — traceability filled after v1.5 roadmap creation*
+*Last updated: 2026-02-22 — ORCH-01–07 reassigned to Phase 18 (gap closure) per milestone audit*
