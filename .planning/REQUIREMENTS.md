@@ -9,11 +9,11 @@ Requirements for v1.5 Workflow Orchestrator + Structured Output Parsing.
 
 ### Parsing
 
-- [ ] **PARSE-01**: Server parses structured output from Copilot responses using multi-strategy extraction (activity.value, activity.entities, JSON code blocks in text, Adaptive Card data fields)
-- [ ] **PARSE-02**: Extracted JSON is validated against CopilotStructuredOutputSchema using Zod with .passthrough() for forward compatibility
-- [ ] **PARSE-03**: Parser produces ParsedTurn containing data, nextAction, nextPrompt, displayMessages, confidence, citations, and parseErrors
-- [ ] **PARSE-04**: Parser never throws on parse failure — returns parseErrors array and falls through to passthrough mode
-- [ ] **PARSE-05**: Shared workflow schemas (CopilotStructuredOutputSchema, ParsedTurn types) defined in shared/src/schemas/workflow.ts
+- [x] **PARSE-01**: Server parses structured output from Copilot responses using multi-strategy extraction (activity.value, activity.entities, JSON code blocks in text, Adaptive Card data fields)
+- [x] **PARSE-02**: Extracted JSON is validated against CopilotStructuredOutputSchema using Zod with .passthrough() for forward compatibility
+- [x] **PARSE-03**: Parser produces ParsedTurn containing data, nextAction, nextPrompt, displayMessages, confidence, citations, and parseErrors
+- [x] **PARSE-04**: Parser never throws on parse failure — returns parseErrors array and falls through to passthrough mode
+- [x] **PARSE-05**: Shared workflow schemas (CopilotStructuredOutputSchema, ParsedTurn types) defined in shared/src/schemas/workflow.ts
 
 ### Orchestration
 
@@ -27,9 +27,9 @@ Requirements for v1.5 Workflow Orchestrator + Structured Output Parsing.
 
 ### Context Building
 
-- [ ] **CTX-01**: Context builder prepends structured preamble to Copilot queries containing current step, collected data summary, and turn number
-- [ ] **CTX-02**: Context preamble format is configurable (not hardcoded) to accommodate different Copilot agent prompt formats
-- [ ] **CTX-03**: Context preamble respects a configurable max length (default 2000 chars) to prevent context window overflow
+- [x] **CTX-01**: Context builder prepends structured preamble to Copilot queries containing current step, collected data summary, and turn number
+- [x] **CTX-02**: Context preamble format is configurable (not hardcoded) to accommodate different Copilot agent prompt formats
+- [x] **CTX-03**: Context preamble respects a configurable max length (default 2000 chars) to prevent context window overflow
 
 ### Route Updates
 
@@ -90,14 +90,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARSE-01 | Phase 15 | Pending |
-| PARSE-02 | Phase 15 | Pending |
-| PARSE-03 | Phase 15 | Pending |
-| PARSE-04 | Phase 15 | Pending |
-| PARSE-05 | Phase 15 | Pending |
-| CTX-01 | Phase 15 | Pending |
-| CTX-02 | Phase 15 | Pending |
-| CTX-03 | Phase 15 | Pending |
+| PARSE-01 | Phase 15 | Complete |
+| PARSE-02 | Phase 15 | Complete |
+| PARSE-03 | Phase 15 | Complete |
+| PARSE-04 | Phase 15 | Complete |
+| PARSE-05 | Phase 15 | Complete |
+| CTX-01 | Phase 15 | Complete |
+| CTX-02 | Phase 15 | Complete |
+| CTX-03 | Phase 15 | Complete |
 | ORCH-01 | Phase 16 | Pending |
 | ORCH-02 | Phase 16 | Pending |
 | ORCH-03 | Phase 16 | Pending |

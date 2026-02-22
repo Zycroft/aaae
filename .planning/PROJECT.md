@@ -132,7 +132,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
-**Current state (v1.4 complete):** 14 phases, 38 plans shipped across 5 milestones (v1.0–v1.4). Redis-backed persistent state store fully operational with ioredis TLS, per-key TTL, sorted-set user index, pipeline batching, health endpoint reporting, JWT claim integration in routes, Redis/Copilot error differentiation (503 vs 502), and 91 unit tests across 7 test files.
+**Current state (v1.5 Phase 15 complete):** 15 phases, 41 plans shipped across 5 milestones (v1.0–v1.4) + Phase 15 of v1.5. Structured output parser and context builder shipped: CopilotStructuredOutputSchema with .passthrough() for forward compatibility, parseTurn() with non-throwing contract (ParsedTurn discriminated union), buildContextualQuery() with configurable preamble and max-length truncation. 116 unit tests across 9 test files.
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -203,6 +203,11 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | Optional chaining with fallback (`req.user?.oid ?? 'anonymous'`) | Defensive coding even though auth middleware guarantees req.user | ✓ Good — safe against edge cases |
 | Factory tests use InMemoryConversationStore directly | Avoids config.ts side effects (process.exit) when importing factory singleton in test | ✓ Good — tests store behavior without env dependency |
 | Name-based Redis error detection (err.name) over instanceof | ioredis v5 does not export TimeoutError; redis-errors package hierarchy detectable via error name | ✓ Good — more comprehensive, covers 7 error classes |
+| CopilotStructuredOutputSchema all fields optional + .passthrough() | Forward compatibility — Copilot responses may evolve, unknown fields should not break validation | ✓ Good — allows schema evolution without code changes |
+| Parser operates on NormalizedMessage[] not raw Activity[] | Reuse extractedPayload from activityNormalizer rather than re-extracting | ✓ Good — single responsibility, avoids redundant extraction |
+| ParsedTurn three-kind discriminated union (structured/passthrough/parse_error) | Distinguish "no data found" from "data found but invalid" — enables observability | ✓ Good — orchestrator can route decisions based on kind |
+| Context builder default maxLength 2000 chars | Conservative estimate for Copilot token budget; configurable for tuning | TBD — Phase 18 observability will validate |
+| String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
 
 ---
-*Last updated: 2026-02-22 after v1.4 milestone*
+*Last updated: 2026-02-22 after Phase 15*

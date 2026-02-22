@@ -69,7 +69,7 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
 
 **Milestone Goal:** Transform the Node server from a stateless proxy into a Workflow Orchestrator that parses structured output from Copilot responses, maintains per-conversation workflow state in Redis, enriches outbound queries with accumulated context, and routes all existing endpoints through the orchestrator — while preserving passthrough behavior when Copilot returns unstructured text.
 
-- [ ] **Phase 15: Parser + Context Builder** - Shared schemas, multi-strategy structured output parser, and configurable context builder
+- [x] **Phase 15: Parser + Context Builder** - Shared schemas, multi-strategy structured output parser, and configurable context builder — completed 2026-02-22
 - [ ] **Phase 16: Workflow Orchestrator Engine** - Stateful orchestration service with Redis persistence, per-conversation locking, and context accumulation
 - [ ] **Phase 17: Route Integration + Compatibility** - Wire orchestrator into all chat routes, update API schemas, validate backward compatibility, and ship integration tests
 
@@ -88,9 +88,9 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
 **Plans**: 3 plans
 
 Plans:
-- [ ] 15-01-PLAN.md — Shared workflow schemas (CopilotStructuredOutputSchema, ParsedTurn, NextAction) in shared/src/schemas/workflow.ts
-- [ ] 15-02-PLAN.md — TDD: Structured output parser (parseTurn, multi-strategy extraction + Zod validation)
-- [ ] 15-03-PLAN.md — TDD: Context builder (buildContextualQuery, configurable preamble + max-length truncation)
+- [x] 15-01-PLAN.md — Shared workflow schemas (CopilotStructuredOutputSchema, ParsedTurn, NextAction) in shared/src/schemas/workflow.ts
+- [x] 15-02-PLAN.md — TDD: Structured output parser (parseTurn, multi-strategy extraction + Zod validation)
+- [x] 15-03-PLAN.md — TDD: Context builder (buildContextualQuery, configurable preamble + max-length truncation)
 
 ### Phase 16: Workflow Orchestrator Engine
 **Goal**: A WorkflowOrchestrator service manages the full per-turn loop (load state, enrich query, call Copilot, normalize, parse, update state, save) with atomic Redis state persistence and per-conversation sequential processing
@@ -102,7 +102,12 @@ Plans:
   3. A card action submission flows through the orchestrator and produces a WorkflowResponse containing both the assistant messages and the updated workflowState
   4. Killing and restarting the server mid-workflow and then sending another message resumes correctly from the persisted Redis state
   5. Sending ten concurrent requests for the same conversationId results in all requests completing with a consistent final state (no data lost due to race conditions)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — TDD: RedisWorkflowStateStore with 24h sliding TTL + ConversationLock with SET NX PX
+- [ ] 16-02-PLAN.md — WorkflowResponse types, orchestrator config, and workflow step definitions
+- [ ] 16-03-PLAN.md — TDD: WorkflowOrchestrator service class (full per-turn loop with DI)
 
 ### Phase 17: Route Integration + Compatibility
 **Goal**: All three chat routes (/start, /send, /card-action) delegate to the orchestrator and return workflowState in their responses, while existing chat behavior is fully preserved when no structured output is present
@@ -134,6 +139,6 @@ Plans:
 | 12. Redis Implementation + Resilience | v1.4 | 2/2 | Complete | 2026-02-22 |
 | 13. Route Integration + Tests | v1.4 | 1/1 | Complete | 2026-02-22 |
 | 14. Redis Error Differentiation | v1.4 | 1/1 | Complete | 2026-02-22 |
-| 15. Parser + Context Builder | v1.5 | 0/? | Not started | - |
-| 16. Workflow Orchestrator Engine | v1.5 | 0/? | Not started | - |
+| 15. Parser + Context Builder | v1.5 | 3/3 | Complete | 2026-02-22 |
+| 16. Workflow Orchestrator Engine | v1.5 | 0/3 | Planned | - |
 | 17. Route Integration + Compatibility | v1.5 | 0/? | Not started | - |

@@ -39,6 +39,15 @@ export {
 } from './schemas/storedConversation.js';
 
 export {
+  NextActionSchema,
+  type NextAction,
+  CopilotStructuredOutputSchema,
+  type CopilotStructuredOutput,
+  ParsedTurnSchema,
+  type ParsedTurn,
+} from './schemas/workflow.js';
+
+export {
   StartConversationResponseSchema,
   type StartConversationResponse,
   SendMessageRequestSchema,
