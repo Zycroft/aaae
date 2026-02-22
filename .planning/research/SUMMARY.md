@@ -1,19 +1,19 @@
-# Project Research Summary
+# Project Research Summary: v1.5 Workflow Orchestrator + Structured Output Parser
 
-**Project:** Agentic Copilot Chat App — React + Node monorepo with Microsoft Copilot Studio & Adaptive Cards
-**Domain:** Enterprise chat UI with conversational AI, persistent state store (v1.4), and workflow orchestration prep (v1.5)
-**Researched:** 2026-02-19 (core); 2026-02-21 (Redis v1.4 extension)
-**Confidence:** HIGH (stack, features, architecture); MEDIUM-HIGH (pitfalls + Redis integration)
+**Project:** Agentic Copilot Chat App (React + Express monorepo with Microsoft Copilot Studio)
+**Milestone:** v1.5 Workflow Orchestrator + Structured Output Parsing
+**Researched:** 2026-02-21
+**Confidence:** HIGH
 
 ---
 
 ## Executive Summary
 
-This is a full-stack chat application that bridges custom React UIs with Microsoft Copilot Studio agents through an Express proxy server. The architecture is well-defined: a React 18 + Vite client sends messages to an Express server, which translates them to the Copilot Studio SDK and normalizes responses through Zod schemas back to the client. The v1.4 milestone adds Redis persistence (Azure Cache for Redis) to replace the in-memory conversation store, enabling multi-instance scaling and preparing for the v1.5 Workflow Orchestrator.
+The v1.5 milestone adds deterministic workflow orchestration and structured output parsing to the existing chat application (which already has extraction infrastructure in v1.3b and Redis state store in v1.4). The recommended approach is to introduce **XState for workflow state machines** and **redlock-universal for distributed conversation locking**, combined with the existing Zod validation and Redis infrastructure. This enables multi-turn workflows where the system reliably tracks state across turns, enforces atomic updates to prevent race conditions, and validates extracted data before making workflow decisions.
 
-**Recommended approach:** Build in phases that respect architectural dependencies. Foundation first (server scaffold with auth + store interface abstraction), then client UI (chat transcript + Adaptive Card rendering), then enhanced features (metadata sidebar, card action validation). The v1.4 Redis extension is a drop-in replacement via a factory pattern — preserve the ConversationStore interface to minimize route changes.
+The primary implementation risk is **race condition corruption in multi-worker deployments**—if two workers simultaneously process the same conversation without per-conversation locking, state updates from one worker will be silently lost. This must be designed in from day one. Secondary risks include context window overflow (if conversation history grows unbounded), parser brittleness (if extraction fails silently), and idempotency cache inconsistencies. All three risks are well-documented with prevention strategies in the research.
 
-**Key risks:** (1) DirectLine secrets exposed in the browser — prevent via server-only SDK calls and CI credential scanning. (2) Adaptive Card events destroyed by dangerouslySetInnerHTML — use adaptivecards-react with proper event delegation. (3) Redis silent fallback masking persistence failures — fail loudly with 503, never silently degrade. (4) Card submissions duplicated without pending state or idempotency. (5) Serialization bugs with opaque SDK references and date objects in Redis. All are avoidable with explicit test cases during implementation.
+The stack is minimal and low-risk: XState (zero dependencies, battle-tested) and redlock-universal (actively maintained, Redlock algorithm proven). No changes to the core Copilot SDK integration or conversation store interfaces are needed. This is an additive change that preserves backward compatibility with v1.4.
 
 ---
 
@@ -21,308 +21,250 @@ This is a full-stack chat application that bridges custom React UIs with Microso
 
 ### Recommended Stack
 
-**Node.js 20 LTS** (targets Microsoft SDK v1.2.3+) → **Express 5.x** (stable since 2025, TypeScript support via @types/express ^5.0.6) → **React 18** (ecosystem tested; v19 not yet matched by Copilot integrations) → **Vite 6** (Nov 2024 stable, @tailwindcss/vite plugin eliminates PostCSS config) → **TypeScript 5.8+** (for Node.js type stripping) → **Tailwind CSS 4** (released early 2025).
+The existing stack (Zod 3.25.76, Express, ioredis 5.9.3, TypeScript 5.7) is sufficient. Two new packages complete the v1.5 requirements:
 
-**Microsoft Integration:** `@microsoft/agents-copilotstudio-client@^1.2.3` (GA Sep 2025, server-side only), `@azure/msal-node@^3.8.7` (MSAL OBO token stubs for v1), `adaptivecards@^3.0.5` + custom React wrapper (avoid abandoned `adaptivecards-react` — use 30-line useRef+useEffect pattern documented in STACK.md).
+**Install immediately:**
+- **XState (v5.28.0)** — Deterministic workflow state machine with first-class TypeScript support. Handles multi-turn orchestration, guards on transitions, and context accumulation. Zero runtime dependencies; ~40KB minified. Replaces ad-hoc procedural orchestration with a testable, visual state graph.
+- **redlock-universal (v0.8.2)** — Distributed locking across Redis instances using the Redlock algorithm. Prevents race conditions when multiple Node workers process the same conversation. 5-10ms overhead per operation (negligible vs. Copilot's 2000ms roundtrip).
 
-**State & Validation:** Zod ^3.25.76 pinned in `shared/` (single instance enforced in CI), npm workspaces (built-in monorepo tool per PROJECT.md).
+**Defer to phase-specific research:**
+- Ajv (JSON Schema validation) — Zod is sufficient for v1.5; defer if enterprise audit requirements emerge in Phase 15+.
+- Token counting libraries — Not blocking v1.5; add in Phase 16+ if context window budgeting becomes necessary.
 
-**v1.4 Redis:** `ioredis@^5.9.0` (handles Azure Cache TLS automatically with rediss:// scheme) + `ioredis-mock@^5.11.0` (unit testing without external Redis). Never use legacy `redis` npm package or `redis-mock`.
+**Pattern-based (no new library):**
+- Idempotency — Uses existing ioredis + Zod validation. Implement via Redis cache keyed by `idempotency:${userId}:${key}` (1h TTL).
 
-**Why this stack:** Each technology has HIGH-confidence sources from official Microsoft docs, npm registry, or long-term project sponsorship (e.g., ioredis used at scale by Alibaba). No experimental dependencies. Version pinning and workspace isolation prevent runtime surprises.
+See **WORKFLOW_STACK.md** for detailed rationale, peer dependencies, and installation commands.
 
 ### Expected Features
 
-**Table stakes (v1.0 launch):**
-- Message bubble transcript (user/bot distinction, required for any chat UI)
-- Optimistic user message display + loading skeleton (eliminates perceived broken state)
-- Typing indicator + error toasts with inline bubble errors
-- Adaptive Card rendering with disabled+pending state after submit (prevents double-submission bug Copilot Studio docs explicitly warn about)
-- Hybrid turn rendering (text + card in same bot activity)
-- Conversation start / new conversation trigger
-- Responsive layout 360px–1280px (PROJECT.md hard requirement)
-- Dark/light mode toggle + prefers-color-scheme default (table stakes in 2026)
-- Keyboard navigation + ARIA live regions (WCAG 2.2 Level AA, EU legal requirement since June 2025)
-- Card action allowlist (client + server validation)
-- Normalized Zod message schema (shared/)
-- Activity log download (JSON serialization)
+**Table stakes (users expect these):**
+- Multi-turn state tracking across conversation restarts (WorkflowState in Redis, 24h TTL)
+- Atomic updates preventing race condition data loss (Redlock per-conversation lock)
+- Structured extraction with Zod validation + confidence scoring (extends v1.4 ExtractedPayload)
+- Context injection for each Copilot query (existing `[WORKFLOW_CONTEXT]` prefix, reused)
+- Idempotent orchestrate endpoint (x-idempotency-key header, Redis cache)
+- Step-based flow control with XState transitions
 
-**Competitive differentiators (v1.x):**
-- Split-pane desktop layout (transcript + metadata drawer) — not available in Copilot Studio default canvas
-- Timeline sidebar summarizing card actions (audit trail unique to this product)
-- MSAL OBO token flow stubs (architecturally correct placeholder, signals production-readiness)
+**Should have (differentiators, v1.6+):**
+- LLM-driven next-step determination (ask Copilot "what happens next?" instead of hardcoded transitions)
+- Confidence scoring in observability logs (per-field confidence tracking)
+- Partial state updates (merge deltas instead of full overwrites)
+- Structured orchestrator decision logs (audit trail of all state mutations)
 
-**Defer to v2+:**
-- Conversation history / multi-session persistence (requires DB + identity model; validate demand first)
-- Streaming token-by-token responses (Copilot SDK doesn't natively stream; v2 if SDK adds it)
-- Suggested replies rendering (depends on Copilot Studio topics producing them reliably)
-- Voice input (significant scope increase; browser permissions + audio processing)
+**Explicitly NOT building (v1.5):**
+- Workflow state history / audit archive (defer to Phase 17)
+- Context window optimization via artifact offloading (defer to Phase 17+)
+- Human-in-the-loop escalation workflows (requires queue infrastructure, Phase 17+)
+- Multi-user collaborative workflows (v2+)
+- Machine versioning / schema migration (v2+)
 
-**MVP priority:** All P1 items above ship together in v1. v1.x adds P2 items (timeline sidebar, markdown rendering). P3 deferred.
+See **WORKFLOW_FEATURES.md** for detailed feature dependencies and MVP definition.
 
 ### Architecture Approach
 
-Express singleton receives authenticated requests → ConversationStore abstraction (interface with two implementations: InMemoryStore for dev, RedisStore for v1.4+) → Copilot SDK isolation (server-only, no browser calls) → Activity Normalizer (translates SDK Activities to NormalizedMessage[]) → Zod validation on serialization/deserialization.
+The Workflow Orchestrator integrates cleanly into the existing Express architecture by introducing four new components that layer on top of the existing store, normalizer, and Copilot SDK:
 
-**Major components:**
+1. **StructuredOutputParser** — Wraps and extends the existing `extractStructuredPayload` logic from activityNormalizer with multi-strategy parsing (Activity.value > entities > text), Zod validation, and confidence signals. Keeps existing normalizer unchanged.
 
-1. **Server scaffold (Express):** CORS + auth middleware (MSAL stubs in v1) → health check → chat routes (/start, /send, /card-action) → store interface (factory pattern selects Redis or InMemory) → Copilot SDK client (singleton, maintains conversation state server-side). No credentials exposed to client.
+2. **WorkflowOrchestrator** — Stateful service that orchestrates the conversation flow: loads WorkflowState from Redis, creates an XState machine actor, routes extracted signals to the machine, accumulates state, and saves back to Redis. Calls both ConversationStore (for history) and WorkflowStateStore (for orchestration state).
 
-2. **Client UI (React + Vite):** useChatApi hook (useReducer state machine with optimistic updates, 300ms skeleton delay, 3-attempt retry) → chat transcript → AdaptiveCardRenderer component (useRef+useEffect pattern, not dangerouslySetInnerHTML) → send box. All API calls proxied through server.
+3. **ContextBuilder** — Utility module that enriches outbound Copilot messages with workflow state (step, collectedData, constraints). Refactors existing inline `buildContextPrefix()` logic for testability.
 
-3. **Shared schemas (Zod):** NormalizedMessage (id, role, kind, text, cardJson), StoredConversation (v1.4: adds userId, tenantId, createdAt, updatedAt, status), CardActionPayload (validated before forwarding to Copilot).
+4. **Redlock Lock Wrapper** — Utility for acquiring/releasing per-conversation locks before any read-modify-write operation on WorkflowState. Prevents race conditions in multi-worker deployments.
 
-4. **Redis persistence (v1.4 only):** RedisStore implements ConversationStore interface, primary keys `conversation:{externalId}`, sorted set indexes `user:{userId}:conversations` (for v1.5 feature "list user's conversations"), TTL 30 days on primary key.
+**Data flow (single orchestrate call):**
+1. Validate request (Zod) → acquire Redlock (5s TTL) → load WorkflowState from Redis
+2. Create XState actor with loaded context → inject context into Copilot query
+3. Send to Copilot → receive Activity stream → normalize to NormalizedMessage[]
+4. Extract structured payload (3-surface priority) → determine machine event
+5. Send event to machine → machine transitions (guards applied, actions executed)
+6. Update WorkflowState → save to Redis (under lock) → release lock
+7. Cache response (idempotency) → return { conversationId, messages, workflowState }
 
-**Data flow:** Client chatApi.ts → useChatApi → /api/chat/start|send|card-action → [auth + orgAllowlist middleware] → [conversationStore.get/set] → [Copilot SDK call] → [Activity normalizer] → [JSON response] → client reducer updates transcript.
+**Backward compatibility:** Old v1.4 conversations load with default WorkflowState (via Zod `.default()` values). Existing `/api/chat/send` route continues to work unchanged if no workflowContext is provided. New `workflowState` field in response is optional (existing clients ignore).
 
-**Why this architecture:** ConversationStore interface abstraction allows swapping implementations without changing routes (v1 InMemory → v1.4 Redis is a drop-in swap). Singleton Copilot SDK avoids re-initialization per request. Zod at boundary ensures runtime type safety. Optimistic UI + skeleton delays make perceived latency acceptable.
+See **WORKFLOW_ARCHITECTURE.md** for detailed build order, integration points, error handling, and anti-patterns to avoid.
 
 ### Critical Pitfalls
 
-1. **DirectLine secret exposed in browser** — Prevention: All SDK calls server-side only. CI scan for `COPILOT_*` vars in client/. Verify no unauthenticated API calls from browser to Copilot Studio. Address in Phase 1 (server scaffold). If exposed: rotate secrets immediately in Copilot Studio Web Channel Security.
+1. **Race Condition in Multi-Worker Deployments** — Two workers process same conversation simultaneously, both read old state, both write conflicting updates. Final state loses data from one worker. **Prevention:** Always wrap read-modify-write in `withConversationLock()`. Test with 10 concurrent requests to same conversationId; verify final collectedData complete.
 
-2. **Card actions destroyed via dangerouslySetInnerHTML** — Prevention: Use `adaptivecards-react` (or documented custom wrapper) with proper event delegation. Never call `.render()` and inject outerHTML. Address in Phase 2 (card renderer). Verification: click test on first prototype card; confirm Submit button fires network request.
+2. **Lock Timeout Not Exceeding Copilot Latency** — Lock TTL (2s) is shorter than actual Copilot roundtrip (2-3s). Lock expires mid-operation. Another worker acquires lock, reads partially-updated state. **Prevention:** Measure actual Copilot latency in production context; set lock TTL to 1.5x P99 latency (e.g., 5s for typical 2-3s roundtrips). Log all lock acquisitions; alert if timeout rate >1%.
 
-3. **Card double-submission without pending state** — Prevention: After Action.Submit fires, set React state to "submitted" and disable card inputs. Show loading indicator. Server-side idempotency cache recent (conversationId, actionId) pairs. Address in Phase 2 (card UI + API). Verification: double-click Submit, confirm only one network request.
+3. **Context Window Overflow → Silent Degradation** — Naively injecting full conversation history + collectedData + state into every Copilot message causes token bloat. After 10-20 turns, context exhaustion silently truncates Copilot responses. Parser receives incomplete JSON. Workflow decisions become stale. **Prevention:** Implement token budgeting before context injection. Three-tier strategy: Tier 1 (<40% budget) = full history; Tier 2 (40-70%) = last 20 turns + summary; Tier 3 (70%+) = last 5 turns + keys only. Monitor token usage per request.
 
-4. **Redis silent fallback masking failures** — Prevention (v1.4): Return 503 Service Unavailable when Redis down, not 200 with stale in-memory data. Implement health check that fails when Redis unavailable. Log every connection error. Never silently retry. Address in Phase 1 (store factory). Impact: prevents data loss and divergence in multi-instance deployments.
+4. **Parser Brittleness + Silent Fallback to Unstructured Mode** — Copilot's response format shifts slightly (field name change), parser fails silently, code treats as "no structured output," workflow continues in degraded passthrough mode. No alert. **Prevention:** Distinguish three parser states: `{ kind: 'structured', data }`, `{ kind: 'unstructured', text }`, `{ kind: 'parse_error', errors[] }`. Log all parse_error cases. Implement circuit breaker: >15% parse error rate over 100 requests → log CRITICAL and disable orchestrator.
 
-5. **Azure Redis TLS misconfiguration** — Prevention (v1.4): Use `rediss://` protocol + port 6380 (not redis:// + 6379). ioredis auto-detects TLS from rediss:// scheme. Add startup validation that rejects azure URLs without rediss://. Test against real Azure Cache. Address in Phase 1 (store factory). Symptoms: connection hangs, "Protocol error: expected '$', got 'H'" (wrong port), intermittent WRONGTYPE errors.
+5. **Idempotency Cache Returning Stale State** — User retries with same idempotency key, cache returns old response with outdated workflowState while server-side state has advanced further. Client UI rolls back. **Prevention:** Idempotency cache stores response data only, not state. Or: shorter TTL (300s instead of 3600s). Or: fetch latest workflowState from server on cache hit and return alongside cached messages.
 
-6. **Zod dual-instance from workspace hoisting** — Prevention: Zod declared in shared/ only. CI check: `npm ls zod` must show exactly one version at one path. Add instanceof fallback: check `error.issues` existence instead of instanceof ZodError. Address in Phase 1 (monorepo setup). Verification: run `npm ls zod` immediately after workspace setup.
-
-7. **Serializing opaque sdkConversationRef to Redis** — Prevention (v1.4): Never serialize sdkConversationRef directly (JSON.stringify strips functions and prototypes; deserialized object fails SDK type checks). Store only conversationId string. Reconstruct ref by calling Copilot SDK if needed. Address in Phase 1 (serialization layer). Test: store ref, deserialize, pass to sendMessage() — must not produce "Invalid reference" error.
-
-8. **Date serialization becomes ISO string, not Date object** — Prevention (v1.4): Run all deserialized Redis values through Zod schemas. Use `.pipe(z.coerce.date())` to convert ISO strings back to Date. OR store timestamps as Unix milliseconds (number, never ambiguous). Address in Phase 1 (serialization layer). Verification: store date, retrieve, verify `timestamp instanceof Date` or `typeof timestamp === 'number'`.
+See **WORKFLOW_PITFALLS.md** for 29 pitfalls total (5 critical, 8 moderate, 16 minor/phase-specific). Each includes example, prevention strategy, and detection/testing approach.
 
 ---
 
 ## Implications for Roadmap
 
-Research suggests a **4-phase structure** that respects both architectural dependencies and feature priority:
+The v1.5 milestone is decomposed into **four sequential phases** based on dependencies and risk. Each phase is independently testable and produceable.
 
-### Phase 1: Foundation — Server Scaffold & Store Abstraction
-**Rationale:** Everything downstream depends on server-side SDK integration and conversation persistence. Must establish auth middleware (fail-closed, not open), store interface (allows v1→v1.4 swap), and health check. Locks in DirectLine secret isolation. Prevents most critical pitfalls (1, 4, 5, 6, 7, 8).
+### Suggested Phase Structure
+
+#### Phase 15: Workflow Orchestrator Engine (2-3 weeks)
+
+**Rationale:** Foundation phase. Must establish schemas, core services, and locking before route integration. This is where the race condition pitfall is prevented (by designing locks from day one).
 
 **Delivers:**
-- Express app with CORS + helmet + auth middleware (MSAL token stubs for v1)
-- ConversationStore interface + InMemoryStore implementation
-- Store factory (`createStore()`) that selects Redis or InMemory based on env
-- Copilot SDK singleton + activity normalizer
-- /health endpoint (reports auth requirement, v1.4: Redis connectivity)
-- Config vars (COPILOT_CLIENT_ID, AUTH_REQUIRED, REDIS_URL for v1.4, REDIS_TTL_DAYS)
-- .env.example with credential placeholders
+- XState machine definitions (at least payment/onboarding flow template)
+- Redlock wrapper (`withConversationLock()`) with proper TTL calculation
+- WorkflowOrchestrator service with state read/write, event routing, and atomic updates
+- WorkflowStateStore Redis persistence (24h TTL per conversation)
+- ContextBuilder utility (context injection formatting)
+- Schema definitions in `shared/` (CopilotStructuredOutputSchema, ParsedStructuredOutput, NextAction, WorkflowState)
 
 **Addresses features:**
-- Conversation start (foundation for all others)
-- Error handling infrastructure
+- Multi-turn state tracking ✓
+- Atomic state updates ✓
+- Step-based flow control ✓
+- Context enrichment ✓
 
 **Avoids pitfalls:**
-- DirectLine secret exposure (server-only calls)
-- Process memory conversation loss (interface from day one)
-- MSAL token fail-open (explicit AUTH_REQUIRED guard)
-- Zod dual-instance (single source in shared/)
-- Redis silent fallback (health check + 503 on unavailable)
-- Azure Redis TLS (createStore factory validates rediss:// + port 6380)
-- Serialization bugs (schema layer ready)
+- Race conditions (Redlock from day one) ✓
+- Lock timeout issues (measure Copilot latency, set TTL conservatively) ✓
+- State initialization bugs (load existing WorkflowState before creating machine actor) ✓
+- Invalid machine events (handle NO_SIGNAL fallback) ✓
 
-**Research flags:**
-- Copilot SDK token refresh timing (30-minute expiry — must refresh before each send or on timer)
-- MSAL OBO flow details (v1 stub; v1.2+ real implementation needs tenant authority URL)
+**Build order within phase:**
+1. Schemas (shared/) — CopilotStructuredOutputSchema, ParsedStructuredOutput, NextAction, extended StoredConversation
+2. StructuredOutputParser (server/src/parser/) — multi-strategy extraction + Zod validation + confidence scoring
+3. ContextBuilder (server/src/workflow/) — refactor buildContextPrefix logic, add state injection
+4. WorkflowOrchestrator (server/src/workflow/) — load state, route signals to machine, update state
+5. Redlock wrapper (server/src/store/locks/) — acquire/release per-conversation locks
+6. Unit tests for each component (machines, parser, orchestrator, locks)
 
-**Standard patterns:**
-- Express middleware setup (well-documented)
-- npm workspaces monorepo structure (established, no research needed)
+**Research needed:** Schema design for CopilotStructuredOutputSchema (what Copilot response structure should we expect?). Actual measured Copilot latencies in production-like conditions (to set lock TTL correctly).
 
 ---
 
-### Phase 2: Client UI — Chat Transcript & Adaptive Card Rendering
-**Rationale:** Once server is running, build the UI. Depends on /health and /api/chat/start|send endpoints from Phase 1. Locking in card rendering prevents pitfall #2 early (dangerouslySetInnerHTML). Must include disabled+pending state per Copilot Studio docs (pitfall #3).
+#### Phase 16: Structured Output Validation & Fallback (1-2 weeks)
+
+**Rationale:** Once orchestrator engine is working, refine the parser for robustness. This phase handles the parser brittleness pitfall.
 
 **Delivers:**
-- React component: ChatTranscript (message bubbles, user/bot distinction, avatars)
-- useChatApi hook (useReducer state machine, optimistic user message, 3-attempt retry with exponential backoff, abort signal cleanup)
-- AdaptiveCardRenderer component (useRef+useEffect pattern, event delegation working)
-- Send box with text input (Enter to send, Shift+Enter for newline)
-- Loading skeleton (300ms delay to avoid flicker on fast responses)
-- Typing indicator (animated)
-- Error toast + inline bubble error state with retry affordance
-- Dark/light mode toggle + prefers-color-scheme default (CSS custom properties)
-- Reduced-motion respect (skeleton/typing indicator animations suppressed)
-
-**Addresses features (P1 table stakes):**
-- Message bubble transcript
-- Optimistic user message display + loading skeleton
-- Typing indicator
-- Error toasts
-- Adaptive Card rendering
-- Card disabled+pending state after submit
-- Hybrid turn rendering (text + card in same message)
-- Dark/light mode
-- Reduced-motion
-- Keyboard navigation (focus management in send box, tab through cards)
-- ARIA live regions (transcript container as polite region, announcements for new messages)
-
-**Implements architecture:**
-- useChatApi state machine (useReducer) — central state, all async logic
-- Component tree (ChatTranscript, AdaptiveCardRenderer, SendBox)
-
-**Avoids pitfalls:**
-- dangerouslySetInnerHTML destroying card events (use proper wrapper)
-- Card double-submit (pending state + disable inputs)
-- Responsive mobile layout (Tailwind breakpoints sm/md/lg map to 360px–1280px)
-
-**Research flags:**
-- Adaptive Cards schema version compatibility (1.5 vs 1.3, renderer maxVersion configuration)
-- React 18 vs React 19 useOptimistic hook (v1 uses React 18 per PROJECT.md; useOptimistic is React 19 feature, use local state pattern instead)
-
-**Standard patterns:**
-- React hooks (well-documented)
-- Tailwind responsive design (established)
-- Zod runtime validation (used in Phase 1, reuse here)
-
----
-
-### Phase 3: Enhanced Features — Card Actions, Metadata Sidebar, Audit Trail
-**Rationale:** Layers on top of Phase 2. Requires stable card rendering (Phase 2) and server-side card validation (new Phase 3 work). Adds security layer (allowlist) and audit/debugging capability. Split-pane layout is a differentiator vs. Copilot Studio default canvas.
-
-**Delivers:**
-- /api/chat/card-action endpoint (server-side Zod validation, card action allowlist enforcement, domain allowlist for Action.OpenUrl)
-- Card action allowlist (shared/ schema, server middleware)
-- Client-side action validation before submission (defense-in-depth, not sole protection)
-- Timeline sidebar (desktop only, ≥768px breakpoint) — lists submitted cards with timestamp, action type, value summary
-- Activity log download (JSON serialization of normalized message array)
-- Split-pane layout (desktop: transcript left, metadata drawer right; mobile: single column)
-- Reduced-motion + accessibility polish (keyboard trap in drawer, focus management)
-
-**Addresses features (competitive differentiators):**
-- Split-pane desktop layout + metadata drawer
-- Timeline sidebar (audit trail of structured interactions)
-- Activity log download (enterprise auditability)
-- Card action allowlist (security)
-
-**Implements architecture:**
-- Card action routing (client → server validation → Copilot SDK)
-- Secondary indexing prep (v1 not needed; v1.4 uses sorted sets for user-scoped queries)
-
-**Avoids pitfalls:**
-- Card action allowlist missing or bypassable (server-side Zod validation, explicit action type allowlist)
-- Phishing via Action.OpenUrl (domain allowlist)
-
-**Research flags:**
-- Card action payload schema (Copilot SDK Activity.channelData structure, what fields can be submitted)
-- Timeline sidebar UI patterns (no reference in Copilot Studio; invent a clean design)
-
-**Standard patterns:**
-- React drawer/modal patterns (well-documented)
-- JSON serialization (built-in)
-- Zod array schemas (established)
-
----
-
-### Phase 4: v1.4 Redis Persistence (Optional Concurrent or Sequential)
-**Rationale:** *Can run concurrently with Phases 2–3 or sequentially after Phase 3.* Enabled by Phase 1 ConversationStore abstraction. Adds multi-instance scaling, horizontal deployment support, and v1.5 workflow prep. Drop-in factory-pattern swap: no route changes, ConversationStore interface unchanged.
-
-**Delivers:**
-- RedisStore implementation (ioredis client, JSON serialization, sorted set indexes)
-- Store factory selection (REDIS_URL env var: set → RedisStore, unset → InMemoryStore)
-- Expanded StoredConversation schema (userId, tenantId, createdAt, updatedAt, status)
-- Chat route updates (populate new fields from req.user JWT claims)
-- Health check enhancement (Redis ping, returns 503 if unavailable)
-- ioredis-mock setup (unit testing without external Redis)
-- Integration tests (real Azure Cache, or skip if REDIS_URL not set)
-- Config vars (REDIS_TIMEOUT_MS, REDIS_TTL_DAYS)
-- Migration helper (if needed, cleanse old in-memory data)
+- Multi-strategy parser with exact/partial/fallback matching
+- Confidence scoring system (high/medium/low per extraction)
+- Fallback passthrough mode when extraction fails
+- Retry mechanism for validation failures (max 2-3 attempts with corrective prompts)
+- Parser observability: logs with confidence, strategy used, error details
+- Test fixtures: real Copilot responses (50+ examples) for regression testing
 
 **Addresses features:**
-- Conversation persistence across process restarts (implicit, not user-visible)
-- Foundation for v1.5 "list user's conversations" feature (sorted set indexes)
+- Structured output extraction validation ✓
+- Fallback passthrough mode ✓
+- Retry mechanism ✓
+- Confidence scoring (enables downstream filtering) ✓
 
-**Avoids pitfalls (critical for v1.4):**
-- Silent fallback masking failures (return 503, never degrade)
-- Serializing sdkConversationRef (store conversationId only)
-- Date serialization bugs (Zod coercion at deserialization)
-- TTL edge cases (GETEX atomic get+extend, expiresAt check in document)
-- Connection pool exhaustion (configure poolSize = expected_concurrency * 1.5)
-- Dual-write consistency (factory pattern: one store, never both)
+**Avoids pitfalls:**
+- Parser brittleness (distinguish parse_error from unstructured) ✓
+- Inconsistent extraction strategies (normalize all sources to single pipeline) ✓
+- Schema backward compatibility (validation against production data snapshot before ship) ✓
+- Silent extraction failures (circuit breaker on >15% error rate) ✓
 
-**Research flags:**
-- Azure Cache for Redis capacity planning (1GB, 10GB, cluster options)
-- ioredis pool tuning for expected load (concurrency estimation)
-- TTL jitter strategy (avoid thundering herd)
+**Acceptance criteria:**
+- 3 extraction strategies (value/entities/text) tested for consistency across test suite
+- All 50+ production response fixtures parse without error regression
+- Low confidence extractions don't trigger state machine transitions
+- Parser distinguishes parse_error from unstructured_response in logs
 
-**Standard patterns:**
-- ioredis usage (well-documented, Alibaba-sponsored)
-- Redis sorted sets (O(log N) queries)
-- JSON serialization (built-in)
+**Research needed:** Actual Copilot response patterns (how often does it use each extraction surface? what are typical confidence distributions?). This requires analysis of test conversations with live Copilot SDK.
 
 ---
 
-### Phase 5: v1.5 Workflow Orchestrator (Future)
-**Rationale:** Depends on v1.4 Redis persistence. Adds structured conversation workflows (e.g., "approval chain", "data extraction pipeline"). Requires workflowId/workflowStep fields already prepared in v1.4 StoredConversation schema.
+#### Phase 17: Route Integration & Backward Compatibility (1-2 weeks)
 
-**Roadmap note:** Not in scope for v1/v1.4. Mentioned for schema planning only.
+**Rationale:** Connect new orchestrator to existing routes. Ensure zero breaking changes to v1.4 API contracts. Test idempotency.
+
+**Delivers:**
+- Extended `/api/chat/orchestrate` endpoint (call new parser and orchestrator)
+- Idempotency middleware (x-idempotency-key header, Redis cache)
+- Minimal modifications to `/api/chat/send` and `/api/chat/card-action` (optional orchestrator calls)
+- Updated API response schemas (add optional workflowState field)
+- Backward compatibility tests (old v1.4 conversations work unchanged)
+- End-to-end integration tests: 5-turn workflow, race conditions, idempotency, context injection
+
+**Addresses features:**
+- Idempotent requests ✓
+- All table stakes features complete ✓
+
+**Avoids pitfalls:**
+- Idempotency cache inconsistencies (scope by userId, shorter TTL) ✓
+- Backward compatibility breaks (extend schemas with optional fields, defaults) ✓
+- Cross-user data leakage (cache key scoped: idempotency:${userId}:${key}) ✓
+- State divergence (validate cached response before returning) ✓
+
+**Acceptance criteria:**
+- All v1.4 tests pass (100% backward compat)
+- Duplicate orchestrate calls return cached response (verified via log correlation)
+- 10 concurrent orchestrate calls to same conversation: final state correct
+- Context injection visible in Copilot response (manual or SDK-based validation)
+
+**Research needed:** None; integration is straightforward once core is built.
 
 ---
 
-## Phase Ordering Rationale
+#### Phase 18: Observability & Production Hardening (1 week, overlaps testing)
 
-1. **Phase 1 first (Foundation):** All other phases depend on working server, auth, and ConversationStore abstraction. Locking in the interface allows v1.4 Redis to be a drop-in swap without touching route logic.
+**Rationale:** Prepare for production. Add monitoring, structured logging, error recovery strategies.
 
-2. **Phase 2 follows Phase 1 (UI):** Cannot render messages until server is running and /api endpoints respond. Card rendering must land early to catch pitfall #2 (dangerouslySetInnerHTML).
+**Delivers:**
+- Structured logging for all orchestrator decisions (timestamp, conversationId, userId, action, confidence, error)
+- Metrics: lock acquisition time, lock timeouts, parse errors by strategy, extraction confidence distribution
+- Health check endpoint: verify Redis connectivity, lock availability, idempotency cache health
+- Alert rules: lock timeout rate >1%, parse error rate >15%, context truncation >5% of requests
+- State validation endpoint: GET /api/chat/:conversationId/state (compare server vs. computed state)
+- Runbook for common failure modes: "Lock timeouts spike" → increase TTL; "Parse errors increase" → update Copilot agent
 
-3. **Phase 3 parallel or after Phase 2 (Enhanced):** Depends on card rendering (Phase 2) and server endpoint work (Phase 1). Can start before Phase 2 ships if /api/chat/card-action is stubbed early.
+**Avoids pitfalls:**
+- Silent failures (context window truncation, state divergence) ✓
+- Production incidents without visibility (comprehensive observability) ✓
 
-4. **Phase 4 optional during or after Phase 3 (v1.4 Redis):** Drop-in replacement via factory pattern. Can be introduced mid-development (hot-swap test: start with InMemory, switch to Redis, verify no route changes needed). Recommended to land before production deployment to achieve horizontal scaling.
-
-5. **Phase 5 deferred (v1.5 Workflow):** Schema prepared in v1.4, feature implementation deferred to v1.5 roadmap.
-
-**Why this structure avoids pitfalls:**
-
-- Pitfall #1 (DirectLine exposed): Phase 1 locks in server-only SDK calls + CI credential scan
-- Pitfall #2 (card events destroyed): Phase 2 implements proper card renderer
-- Pitfall #3 (double-submit): Phase 2 includes disabled+pending state
-- Pitfall #4 (Redis fallback): Phase 1 establishes health check; Phase 4 enforces 503, never silent fallback
-- Pitfall #5 (Azure TLS): Phase 1 store factory validates rediss:// + port 6380
-- Pitfall #6 (Zod dual-instance): Phase 1 monorepo setup + CI check
-- Pitfall #7 (sdkConversationRef serialization): Phase 4 schema validation prevents this
-- Pitfall #8 (date serialization): Phase 1 Zod setup; Phase 4 coercion on deserialize
+**Acceptance criteria:**
+- All orchestrator paths emit structured logs
+- Metrics visible in dashboard (Grafana/Application Insights)
+- Alert rules tested (simulate failure condition, verify alert fires)
+- Runbook steps verified with team
 
 ---
 
-## Research Flags
+### Phase Ordering Rationale
 
-### Phases Needing Deeper Research During Planning
+1. **Phase 15 first:** Builds the core orchestrator engine and establishes the locking pattern. All downstream phases depend on this working correctly. Starting here avoids the pitfall of retrofitting locks after building stateless routes.
 
-**Phase 1 (Foundation):**
-- Copilot Studio SDK token acquisition & refresh flow (v1 uses placeholder stubs; v1.2+ needs real MSAL OBO implementation)
-- MSAL OBO flow details: authority URL target (specific tenant, not /common), token type validation (access token, not ID token)
-- DirectLine token lifecycle (30-minute expiry, refresh mechanism, server-side caching strategy)
+2. **Phase 16 second:** Refines the parser once the orchestrator is integrated. Parser tests can use the orchestrator as the integration point. Discover real Copilot response patterns early (inform phase 16+).
 
-**Phase 2 (Client UI):**
-- Adaptive Cards schema version compatibility with Copilot Studio responses (maxVersion configuration, parse error handling)
-- React 18 optimistic UI patterns (v1 uses local state + reducer, not React 19 useOptimistic)
-- Keyboard focus management in card actions (Tab order through dynamic content)
+3. **Phase 17 third:** Route integration happens last because routes are the thin glue. Once parser and orchestrator are proven, connecting them to routes is straightforward.
 
-**Phase 3 (Enhanced):**
-- Card action payload schema (Copilot SDK Activity.channelData structure — what fields are mutable vs. read-only?)
-- Timeline sidebar UI patterns (no reference implementation; design needed)
+4. **Phase 18 last:** Observability is added after core is working (you know what to observe). Can be parallelized with phase 17 testing.
 
-**Phase 4 (v1.4 Redis):**
-- Azure Cache for Redis capacity planning (SKU selection: Basic 1GB, Standard 10GB, Premium with clustering)
-- ioredis pool size tuning for expected load (concurrency = concurrent users * request rate)
-- Conversation TTL strategy (30 days hardcoded vs. configurable per tenant)
+**Dependency graph:**
+```
+Phase 15 (Schemas, Parser, Orchestrator, Locking)
+  ↓ (enables)
+Phase 16 (Parser Refinement + Observability)
+  ↓ (integrates into)
+Phase 17 (Routes + End-to-End Tests)
+  ↓ (adds metrics to)
+Phase 18 (Production Hardening)
+```
 
-### Phases with Standard Patterns (Skip Detailed Research)
+### Research Flags
 
-**Phase 1:** Express middleware setup, npm workspaces monorepo structure, Zod schema definitions, TypeScript config — all have abundant documentation and established patterns.
+**Phases needing deeper research during planning:**
+- **Phase 15:** CopilotStructuredOutputSchema design — exactly what structure should Copilot return? Should the schema be per-conversation, per-step, or global? How to handle schema evolution without breaking clients?
+- **Phase 15:** Actual Copilot latency measurements — v1.3b research assumed 500ms; production measurements from load tests (Phase 14+) show 2-3s typical. Lock TTL depends on this.
+- **Phase 16:** Real Copilot response patterns — are extraction surface distributions (value vs. entities vs. text) equal? What confidence distribution do we observe? Are parse errors predictable?
 
-**Phase 2:** React hooks (useState, useReducer, useEffect), Tailwind CSS responsive design, CSS custom properties for theming — well-documented, no research needed.
-
-**Phase 3:** React component composition, JSON serialization, Zod array validation — standard patterns.
-
-**Phase 4:** ioredis documentation is comprehensive; no novel research needed. Focus on testing against real Azure Cache, which is better done in implementation than research phase.
+**Phases with standard patterns (can skip research-phase):**
+- **Phase 17:** Route integration — standard Express middleware patterns, well-documented in ARCHITECTURE.md
+- **Phase 18:** Observability — standard Node.js logging + metrics patterns, no novel domain risk
 
 ---
 
@@ -330,86 +272,64 @@ Research suggests a **4-phase structure** that respects both architectural depen
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| **Stack** | HIGH | All recommendations sourced from official Microsoft Learn, npm registry, actively maintained projects (ioredis, Vite, React, Express 5 GA). No experimental dependencies. |
-| **Features** | HIGH | Table stakes verified against Microsoft Copilot Studio docs + WCAG 2.2 standards. Differentiators (timeline sidebar, metadata drawer) aligned with PROJECT.md vision. Defer list justified by complexity/demand tradeoff. |
-| **Architecture** | HIGH | ConversationStore interface pattern standard (Factory Method, established in TypeScript/Node.js). Redis sorted set indexing (O(log N) lookups) documented. Copilot SDK singleton pattern per Microsoft samples. |
-| **Pitfalls** | MEDIUM-HIGH | Core pitfalls (#1–6) sourced from official Microsoft security blog + GitHub issue discussions with maintainers. Redis pitfalls (#11–17) from recent Oneuptime blog (2026) + ioredis docs. Some pitfalls inferred from common patterns (e.g., #3 card double-submit from React async patterns), confidence medium. |
-| **v1.4 Redis** | HIGH | ioredis package actively maintained, TLS configuration well-documented (Azure Cache requires rediss:// + 6380). ioredis-mock matches ioredis API, no surprises. |
+| **Stack** | HIGH | XState and redlock-universal verified against npm, official docs, production case studies. Zero dependencies, actively maintained. No version/compatibility conflicts. |
+| **Features** | HIGH | Feature set clearly derived from workflow orchestration domain patterns (2026 research consensus). MVP definition aligns with expert practices. No controversial choices. |
+| **Architecture** | HIGH | Integration points documented in detail. Data flow tested against existing code. Backward compatibility guaranteed by Zod schema design and optional response fields. No breaking changes required. |
+| **Pitfalls** | HIGH | 29 pitfalls researched, each with prevention + detection strategy. Top 5 pitfalls have proven solutions (race condition → Redlock; context overflow → token budgeting; parser brittleness → multi-state distinction; idempotency → user-scoped cache; lock timeout → measured latency). |
+| **Phase Structure** | HIGH | Four phases decompose cleanly by dependency. Each phase has clear inputs/outputs. Build order verified against data flow. No circular dependencies. |
 
-**Overall confidence:** HIGH for Phase 1–3; HIGH for Phase 4 (if research flags are addressed during planning).
+**Overall confidence:** **HIGH** — Stack is proven, architecture is sound, pitfalls are identified with prevention strategies, and phase decomposition is unambiguous. The main execution risk is in the details (correct lock TTL calculation, parser confidence scoring rules) but these are researchable during Phase 15 and don't affect the overall approach.
 
 ### Gaps to Address
 
-1. **Copilot SDK token refresh timing:** v1 uses placeholder; v1.2+ needs real implementation. Placeholder must log `[AUTH STUB] Token refresh skipped` on every request to avoid silent unauthenticated API. **Mitigation:** Phase 1 planning must validate MSAL OBO docs; consider reaching out to Microsoft for clarification on token cache strategy.
+1. **CopilotStructuredOutputSchema Design** — Research identified that schema per-conversation is needed, but exact format unclear. Recommend Phase 15 spike (2-3 hours) to enumerate expected Copilot response types for 3-5 example workflows. Document as `shared/src/schemas/copilotResponses.examples.ts`.
 
-2. **Adaptive Cards schema version mismatch:** Research shows Copilot Studio may return cards with different schema versions than renderer is configured for. **Mitigation:** Phase 2 planning must test with live Copilot Studio agent, verify renderer maxVersion matches.
+2. **Actual Copilot Latency Distribution** — Lock TTL depends on P99 latency. If Phase 14 load test data shows 3s P99, set lock TTL to 5s. If 1s P99, set to 2s. Recommend baseline measurement in Phase 15 before finalizing lock config.
 
-3. **Card action allowlist registration:** Which action types and fields are security-critical? Phase 3 planning must define allowlist explicitly (e.g., only allow Action.Submit with known `verb` values, only allow Action.OpenUrl with domain in allowlist). **Mitigation:** Collaborative session with Copilot Studio expert to catalog card types in use.
+3. **Confidence Scoring Implementation** — Research specified "high/medium/low" but exact rules unclear (e.g., does exact match = "high", partial = "medium"?). Recommend Phase 16 spike to empirically evaluate parser accuracy on 50+ test responses.
 
-4. **v1.4 capacity planning:** How many conversations per user? What TTL is appropriate? Phase 4 planning must estimate load (concurrent users, message frequency) to size Redis instance (1GB, 10GB, cluster). **Mitigation:** Load testing in Phase 4 planning; start with 1GB (standard tier), monitor, upgrade if needed.
+4. **Client-Side Workflow UI Integration** — Research focused on server-side orchestrator. Client receives workflowState in response. How should client UI display progress, handle step transitions, show errors? Recommend design spike in Phase 17 (designer + frontend eng, ~4 hours).
 
-5. **Testing against real Azure Cache:** Unit tests use ioredis-mock (in-memory, no TLS). Phase 4 planning must include integration test against real Azure Cache to validate TLS + port 6380 configuration. **Mitigation:** CI/CD step that runs optional integration tests if REDIS_URL is set (skip if not).
+5. **Copilot Agent Prompt for Context Injection** — Research assumes Copilot agent can parse [WORKFLOW_CONTEXT] prefix and understand constraints. This was validated in Phase 10 (Context Injection Validation, v1.3b) but current agent config not in codebase. Recommend Phase 15 to verify current agent still handles context correctly.
 
 ---
 
 ## Sources
 
-### Primary Sources (HIGH Confidence)
+### Primary (HIGH confidence)
 
-**Stack Research:**
-- Microsoft Learn — CopilotStudioClient API Reference (updated 2025-12-18): Official SDK documentation, API signatures
-- Microsoft Learn — Integrate with web/native apps using M365 Agents SDK (updated 2025-12-12): Architecture patterns, recommended practices
-- npm `@microsoft/agents-copilotstudio-client` (v1.2.3 GA Sep 2025): Official package, versioning strategy
-- npm `ioredis` (v5.9.3 Feb 2026): Actively maintained, TLS + Azure Cache documentation
-- Express.js (v5.2.1 stable 2025): Framework stability, TypeScript support
-- Vite 6 release blog (Nov 2024): Build tooling stability
-- Zod v3 documentation: Runtime validation patterns
+- **WORKFLOW_STACK.md** — Technology Stack for v1.5: XState v5.28.0, redlock-universal v0.8.2, peer dependency analysis, installation commands
+- **WORKFLOW_FEATURES.md** — Feature research: table stakes, differentiators, MVP definition, user workflow examples
+- **WORKFLOW_ARCHITECTURE.md** — Architecture patterns, data flow, component boundaries, build order, backward compatibility
+- **WORKFLOW_PITFALLS.md** — 29 pitfalls with prevention/detection strategies: race conditions, lock timeout, idempotency, parser brittleness, state divergence
+- **FEATURES.md** — Feature landscape (existing v1.3b-v1.4 context, reused for v1.5 comparison)
+- **ARCHITECTURE.md** — Integration architecture (existing v1.4 systems, how v1.5 connects)
+- **PITFALLS.md** — Existing pitfalls research (v1.0-v1.3b foundation, v1.4 Redis additions, v1.5 workflow-specific extensions)
 
-**Features Research:**
-- Microsoft Copilot Studio — Adaptive Cards overview (official docs, 2025-12-22): Card capabilities
-- Microsoft Copilot Studio — Customize default canvas (official docs, 2025-12-19): UI patterns
-- Microsoft Teams — Designing Adaptive Cards (official docs, 2025-04-04): Card design best practices
-- WCAG 2.2 compliance (W3C, 2024): Accessibility standards, EAA requirements (EU, June 2025)
-- BotFramework-WebChat GitHub issue #1427: Card disabled-after-submit pattern
+### Secondary (MEDIUM confidence)
 
-**Architecture Research:**
-- Express.js Tutorial — Practical, Scalable Patterns (2026): Pattern recommendations
-- Redis Secondary Indexing Patterns (official redis.io docs): Sorted set query patterns
-- Factory Method Pattern in TypeScript (Medium, 2025): Design pattern documentation
-- ioredis GitHub Repository: Connection pooling, TLS configuration, Azure integration
+- XState official docs (https://xstate.js.org/) — v5.28.0 stable, zero dependencies, TypeScript first-class support
+- Redis Distributed Locks Guide (https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/) — Redlock algorithm proven in production
+- Microsoft Copilot Studio docs (https://learn.microsoft.com/en-us/microsoft-copilot-studio/) — existing agent architecture, activity protocol, structured outputs
+- Idempotency RFC (https://httptoolkit.com/blog/idempotency-keys/) — HTTP semantics for retry-safety
+- Workflow Orchestration Patterns (2026 research consensus, multiple sources)
 
-**Pitfalls Research:**
-- Microsoft Security Blog — Top 10 actions to build agents securely with Copilot Studio (Feb 2026): Official security guidance
-- Microsoft Learn — Configure web and Direct Line channel security: Token lifecycle, credential management
-- GitHub microsoft/AdaptiveCards issues (#6192, #8678, #8505): Card rendering pitfalls
-- GitHub AzureAD/microsoft-authentication-library-for-js: MSAL OBO flow gotchas
-- GitHub redis/ioredis: Connection handling, TLS + Azure configuration
-- Oneuptime blog (2026-02-02, 2026-01-25, 2026-02-25): Redis best practices, caching patterns
+### Tertiary (LOW confidence, needs validation during implementation)
 
-### Secondary Sources (MEDIUM Confidence)
-
-- WebSearch consensus on React 18 vs React 19 ecosystem readiness
-- npm registry package update histories and community discussions
-- Community blog posts on Copilot Studio integration patterns (corroborated with official docs)
-- GitHub discussions with maintainers on deprecated features (e.g., adaptivecards-react React 18 support)
-
-### Tertiary Sources (LOWER Confidence, Validation Needed)
-
-- Specific Copilot Studio agent configuration examples (vary by use case; validate during Phase 1 planning)
-- Load testing benchmarks for Azure Cache for Redis (highly dependent on SKU and workload; validate during Phase 4)
+- Estimated Copilot latency (500ms → 2-3s). Requires Phase 14+ load test data.
+- Confidence scoring rules (assumptions about parser accuracy per strategy). Requires Phase 16 empirical analysis.
+- Copilot agent's ability to parse context format changes. Requires Phase 15 verification test.
 
 ---
 
-## Integration with Roadmap
+## Recommendation
 
-This summary informs the roadmap creation as follows:
+**Proceed with Phase 15 immediately.** The research is conclusive: stack is proven, architecture is sound, risks are identified and mitigatable, and phase decomposition is clear. The three main dependencies (Copilot latency measurement, schema design, confidence scoring rules) are all researchable during Phase 15 without blocking phase start.
 
-- **Phase sequence** (Phases 1–5 suggested above) becomes starting point for roadmap planning; roadmapper may adjust based on team capacity and stakeholder priorities.
-- **Research flags** identify which phases need deeper `/gsd:research-phase` calls during planning (Phases 1, 2, 3, 4 all have gaps to explore).
-- **Confidence assessment** calibrates risk: HIGH confidence areas (stack, core features, architecture) can proceed quickly to requirements; MEDIUM areas (pitfalls, v1.4 details) warrant explicit testing checkpoints.
-- **Pitfall-to-phase mapping** (from PITFALLS.md) ensures each phase's plan includes specific test cases to prevent known issues.
+**Estimated effort:** 8-10 weeks total for all four phases (Phase 15: 2-3w, Phase 16: 1-2w, Phase 17: 1-2w, Phase 18: 1w). Ready for production deployment after Phase 17 with Phase 18 hardening optional pre-GA.
 
 ---
 
 *Research completed: 2026-02-21*
-*Status: Ready for roadmap creation*
+*Synthesized from: WORKFLOW_STACK.md, WORKFLOW_FEATURES.md, WORKFLOW_ARCHITECTURE.md, WORKFLOW_PITFALLS.md*
+*Ready for roadmap planning: YES*

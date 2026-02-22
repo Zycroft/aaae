@@ -1,8 +1,8 @@
 # Pitfalls Research
 
 **Domain:** React + Node chat app with Microsoft Copilot Studio SDK + Adaptive Cards (monorepo)
-**Researched:** 2026-02-19 (expanded 2026-02-21 for v1.4 Redis persistence)
-**Confidence:** MEDIUM (original); HIGH (Redis additions from current research)
+**Researched:** 2026-02-19 (expanded 2026-02-21 for v1.4 Redis persistence; expanded 2026-02-21 for v1.5 Workflow Orchestration)
+**Confidence:** MEDIUM (original); HIGH (Redis additions); HIGH (Workflow orchestration from current research)
 
 ---
 
@@ -645,6 +645,708 @@ Phase 1 (Store factory). Explicitly document: "Primary store is [Redis|InMemory]
 
 ---
 
+## Workflow Orchestration and Structured Output Parsing Pitfalls (v1.5 Milestone)
+
+### Pitfall 18: Sequential Processing Violation → Race Condition State Corruption
+
+**What goes wrong:**
+Multiple concurrent requests for the same conversation bypass workflow state machine, causing:
+- Two simultaneous `POST /api/chat/send` calls both read stale `WorkflowState`, both execute the same step, both attempt context injection, both write conflicting state
+- Redis sorted-set user index becomes inconsistent with conversation key state (SET succeeds, ZADD fails mid-pipeline)
+- Workflow step counter increments twice for a single user message
+- Parser processes the same Copilot response twice, extracting data twice, collectedData object has duplicate entries
+
+**Why it happens:**
+- No per-conversation lock enforcement in new routes — existing ConversationStore operations are atomic (pipeline) but orchestrator doesn't acquire locks before read-modify-write on WorkflowState
+- Node.js is single-threaded but Express handles concurrent requests in event loop — multiple requests for conversationId='abc' execute concurrently, both call `store.get(conversationId)` before either calls `store.set()`
+- Redis pipeline batches SET + ZADD + EXPIRE but doesn't guarantee ordering across multiple clients
+- Existing v1.4 pipeline handles conversation persistence only; new orchestrator adds 3-4 read-modify-write operations (read state → inject context → send to Copilot → parse response → update state)
+
+**Consequences:**
+- Silent workflow advancement (user sees step N+2 responses instead of N) — hard to detect without logs
+- Duplicate data in collectedData causes schema validation errors downstream
+- User index (ZADD) becomes orphaned, `listByUser()` misses conversations after race condition
+- Parser output gets corrupted (two parseErrors arrays merged, two timestamps on same extraction)
+
+**Prevention:**
+1. Implement Redis SET NX + GET pattern (or Lua script) for per-conversation lock:
+   ```
+   LOCK_KEY = `workflow:lock:${conversationId}`
+   SET lock_key unique_token NX EX 5 seconds
+   [execute orchestrator steps]
+   DEL lock_key only if token still matches
+   ```
+2. Acquire lock BEFORE reading WorkflowState from store
+3. If lock acquisition fails after 3 retries, return 503 (let client retry)
+4. Set lock timeout to max expected orchestrator latency (from v1.3b measurements: 300-500ms for full round-trip) + 2s safety margin
+5. Use idempotency key pattern: client provides `X-Idempotency-Key` header, store result keyed by (conversationId, idempotencyKey) for 60s
+6. Log all lock acquisitions and contentions — early warning sign of traffic spikes or slow Copilot responses
+
+**Detection:**
+- Alert on repeated calls to `/health` that show diverging ConversationStore counts vs. user index size
+- Monitor for step counter jumps > 1 in single request
+- Track collectedData sizes — sudden duplication shows in logs
+- Enable request-level tracing: correlate concurrent requests for same conversationId in logs
+
+**Phase:** Phase 15 (Orchestrator Engine). Must address BEFORE shipping first version — race conditions are easier to fix upfront than retrofit.
+
+---
+
+### Pitfall 19: Context Window Overflow → Silent Failures or Truncated State
+
+**What goes wrong:**
+- Context builder naively includes full conversation history + full collectedData + full WorkflowState + system prompt → token count = 4K-12K tokens depending on conversation length
+- Copilot Studio SDK has token limits per request (varies by model, but ~95K token context window typical for modern LLMs)
+- First 10 messages fit, message 11 causes truncation, Copilot returns incomplete response due to context rot
+- Parser tries to extract from truncated response, gets partial data or malformed JSON
+- Workflow state shows stale "last 10 turns" instead of full history — user asks follow-up about turn #3, orchestrator has no record
+
+**Why it happens:**
+- Milestone doc specifies "context builder format must be configurable" but doesn't include token budgeting strategy
+- Activity normalization (v1.3b) extracts structured payloads efficiently, but conversational context (each text message = 50-200 tokens) accumulates without bounds
+- `[WORKFLOW_CONTEXT]` prefix format from v1.3b is compact, but still adds ~500 tokens per injection
+- Copilot Studio SDK doesn't expose token counting to client code — can't predict overflow until request fails
+- No early warning: request goes to Copilot, comes back truncated, parser interprets truncation as valid "no structured output" response, workflow continues in degraded state
+
+**Consequences:**
+- Conversation hallucination: user asks "like I said earlier, I'm in Seattle" (turn #4), Copilot has no context, invents answer or asks again
+- Workflow step recommendations become stale or contradictory (recommender had full context, next step executor doesn't)
+- Parser misses critical structured signals because source text was truncated mid-JSON-block
+- Silent data loss: collectedData accumulates, but later workflow steps don't see earlier entries because Copilot never had context to recall them
+- Cost explosion: retries on failures cause repeated Copilot calls with similar overlimit contexts
+
+**Prevention:**
+1. Implement token budgeting BEFORE context injection:
+   ```typescript
+   const TOKEN_BUDGET = 60_000; // Leave 35K for Copilot's response + reasoning
+   const SYSTEM_PROMPT_TOKENS = 1_000; // Estimate
+   const WORKFLOW_CONTEXT_TOKENS = estimateTokens(workflowContext); // ~500-1000
+   const AVAILABLE_FOR_HISTORY = TOKEN_BUDGET - SYSTEM_PROMPT_TOKENS - WORKFLOW_CONTEXT_TOKENS;
+
+   // Apply drop-oldest-first strategy if needed
+   let messages = conversation.messages;
+   while (estimateTokens(messages) > AVAILABLE_FOR_HISTORY) {
+     messages.shift(); // Drop oldest
+     logWarning(`Dropping turn ${messages.length} due to token budget`);
+   }
+   ```
+2. Use rough token estimation (1 token ≈ 4 chars for English) initially; switch to official Copilot SDK token counter if available
+3. Implement 3-tier context strategy:
+   - **Tier 1 (< 40% budget):** Full conversation history + full collectedData
+   - **Tier 2 (40-70% budget):** Last 20 turns + summary of earlier context + collectedData keys only (not full values)
+   - **Tier 3 (70%+ budget):** Last 5 turns + collectedData keys only + step name + constraints
+4. Add `contextTruncated` boolean to WorkflowContext — downstream steps know context is degraded
+5. Track token usage in logs: `contextTokens: 2543, budgetAvailable: 60000, utilizationPercent: 4.2`
+6. Create monitoring alert: if `contextTruncated: true` appears in > 5% of orchestrate requests, trigger incident
+
+**Detection:**
+- Monitor mean response time on `/api/chat/orchestrate` — spike indicates context overflow (Copilot taking longer to parse incomplete context)
+- Track `parsedStructuredOutput.isPartial` flag — true means response was likely truncated
+- Check ConversationStore message counts — if same conversation hits message 500+ with slow responses, likely context overflow
+- Implement request-scoped logging: log token budget vs. actual usage on every request
+
+**Phase:** Phase 15 (Orchestrator Engine). Must be designed into context builder from day 1 — refactoring after shipping is complex.
+
+---
+
+### Pitfall 20: Parser Brittleness + Silent Fallback to Unstructured Mode
+
+**What goes wrong:**
+- Parser is designed to "never throw — return parseErrors array" (per milestone constraints)
+- Copilot changes response format slightly: field name shifts from `recommendation` to `next_recommendation`, parser doesn't find field, sets parseErrors: ["field 'recommendation' not found"]
+- Code checks `if (parseErrors.length === 0)` to determine success, treats any error as "no structured output"
+- Workflow continues in passthrough mode — user gets text-only response, orchestrator learns nothing about next step
+- v1.4's backward-compat pattern (StoredConversation defaults) masks the issue — old recordings still work, new failures silent
+- After 5 such failures, collectedData is incomplete, workflow state is stale, system escalates to human agent
+
+**Why it happens:**
+- Milestone specifies "passthrough mode when no structured output detected" for backward compat, but doesn't distinguish between "Copilot returned unstructured text" vs. "Copilot returned malformed structured output"
+- Multi-strategy parsing (Activity.value > Activity.entities > text-embedded) was designed for flexibility, creates ambiguity on format drift
+- No strict schema validation at Copilot Studio agent configuration level (agent can change response format without client knowing)
+- Parser tests likely use mock Copilot responses (controlled format), don't test real drift scenarios
+- ExtractedPayload Zod schema uses `z.refine()` to reject empty objects, but doesn't validate that key fields present — schema can pass with `{ confidence: 0.5, data: { something_unexpected: true } }`
+
+**Consequences:**
+- Silent workflow degradation: system functions but at reduced intelligence
+- Data pipeline becomes unreliable: 70% of responses successfully parse, 30% silently fail, downstream analytics can't trust the data
+- Hard to debug: logs show "passthrough mode" but don't explain why (was Copilot unstructured or parser failed?)
+- Leads to over-engineering compensation: developers add more fallback logic, more edge cases, more test mocks, complexity explodes
+- Breaking changes to Copilot agent configuration (which the milestone says is out of scope) silently break the client without warnings
+
+**Prevention:**
+1. Distinguish three states in parser output:
+   ```typescript
+   type ParserResult =
+     | { kind: 'structured', data: ExtractedPayload }
+     | { kind: 'unstructured', text: string } // Copilot explicitly returned text only
+     | { kind: 'parse_error', text: string, errors: string[] }; // Copilot returned structured-like format that failed validation
+   ```
+2. Log mismatches between expected and actual format:
+   ```typescript
+   if (result.kind === 'parse_error') {
+     logger.warn(`Parser error for conversationId=${id}`, {
+       expectedSchema: 'ExtractedPayload.v1',
+       actualKeys: Object.keys(extractedData),
+       missingKeys: ['recommendation', 'confidence'],
+       errors: result.errors,
+     });
+   }
+   ```
+3. Implement parser version tracking: tag each ExtractedPayload with `parserVersion: '1.0'`, allow schema evolution with migrations
+4. Add schema-level strictness: `ExtractedPayload` requires specific fields (`recommendation`, `confidence`, `nextStep`) — don't allow extras
+5. Create "parser test suite" of real Copilot responses (don't use mocks):
+   - Store 50+ production responses in test/fixtures/copilot-responses/
+   - Re-run parser against them on every release
+   - Fail CI if any response previously parsed now fails
+6. Implement circuit breaker: if parser error rate > 15% over last 100 requests, log CRITICAL and disable orchestrator (return passthrough mode explicitly)
+
+**Detection:**
+- Count successful parse rate by response strategy: `parse.success.by_strategy.activity_value`, `parse.success.by_strategy.text_embedded`, etc.
+- If any strategy drops below 80%, trigger alert
+- Monitor `parseErrors` array length — spike indicates format drift
+- Add metric: `orchestrator.fallback_to_passthrough_reason` tagged with reason (unstructured vs. parse_error)
+
+**Phase:** Phase 16 (Structured Output Parser). Parser architecture must be designed to distinguish failure modes.
+
+---
+
+### Pitfall 21: Idempotency + State Mutation Race Condition
+
+**What goes wrong:**
+- Client retries `/api/chat/send` due to network timeout (doesn't know server received the request)
+- Server received first request, advanced workflow state, stored conversation, updated user index
+- Server receives duplicate request 500ms later, reads same conversation, applies same orchestrator step, advances state again (state = N+1 twice)
+- collectedData now has duplicate entries (same form submission extracted twice)
+- Redis doesn't detect the duplicate — each call to `store.set()` with new timestamp overwrites previous
+- Workflow state shows wrong turn count: `turnCount: 15` instead of `14`
+
+**Why it happens:**
+- v1.4 ConversationStore interface and implementations don't include idempotency key tracking
+- Orchestrator performs multi-step write sequence (read, inject, send to Copilot, parse, write state) — not atomic like v1.4's SET + ZADD + EXPIRE pipeline
+- No idempotency key validation in existing `/api/chat/send` route (was stateless, so retries were safe)
+- Copilot SDK call itself is idempotent (same message → same response), but extracting from response twice corrupts collectedData
+
+**Consequences:**
+- Workflow state diverges from reality: logs show step 14 but UI thinks step 15
+- User duplicates form submissions: collectedData has { email: 'user@example.com' } twice
+- Step counter becomes unreliable for routing logic ("if turnCount < 20, ask for more info" fails)
+- Subtle bugs downstream: reports aggregate collectedData, see 200% completion rates
+
+**Prevention:**
+1. Extend StoredConversation schema to track idempotency:
+   ```typescript
+   const StoredConversation = z.object({
+     // ... existing fields
+     idempotencyKeys: z.record(z.string(), z.object({ // key -> response
+       result: NormalizedMessage.array(),
+       orchestratorState: WorkflowState,
+       timestamp: z.string().datetime(),
+     })).optional().default({}),
+   });
+   ```
+2. On orchestrator entry, check: `if (idempotencyKeys[idempotencyKey]) return idempotencyKeys[idempotencyKey].result`
+3. After orchestrator completes, store result: `idempotencyKeys[idempotencyKey] = { result, orchestratorState, timestamp }`
+4. Implement TTL on stored idempotency results: clean up keys older than 60s on next write
+5. Include idempotency key in request required headers: `X-Idempotency-Key: ${uuid()}` (client generates, required in schema)
+6. Return 200 + original response if duplicate detected, with header: `X-Idempotency-Replay: true`
+
+**Detection:**
+- Monitor idempotency key replay rate: `orchestrator.idempotency_key_replays` — spike indicates network issues or aggressive retries
+- If collectedData array has exact duplicates (same keys, values, timestamps), log WARNING
+- Check turn count vs. message count — should be equal (one user message per turn)
+
+**Phase:** Phase 15 (Orchestrator Engine). Must be part of initial route design.
+
+---
+
+### Pitfall 22: Context Injection Format Drift + Agent Configuration Mismatch
+
+**What goes wrong:**
+- v1.3b specified `[WORKFLOW_CONTEXT] {...}` delimited format for context injection into Copilot messages
+- Copilot Studio agent was trained on that format in Phase 10 (Context Injection Validation)
+- v1.5 context builder refactors format to `{workflow_context: {...}}` JSON block (cleaner parsing)
+- Agent still parses old format, ignores new format, loses workflow context
+- Workflow execution degrades: agent can't see step constraints, recommends actions that violate earlier constraints
+
+**Why it happens:**
+- Milestone says "do NOT modify Copilot Studio agent configuration" but client-side format changes aren't coordinated
+- Context builder is configurable per milestone spec, but format changes aren't tracked in version control
+- No test coverage for agent parsing of injected context (v1.3b tests covered "does injection break responses", not "does agent parse it correctly")
+- Agent instructions are external to this codebase — difficult to version-sync
+
+**Consequences:**
+- Copilot Studio agent becomes unreliable (sometimes sees context, sometimes doesn't)
+- Workflow constraints aren't enforced (agent might attempt actions marked as forbidden in constraints)
+- Debugging is nightmarish: logs show context was injected, but agent doesn't act on it
+
+**Prevention:**
+1. Lock context format at schema definition time:
+   ```typescript
+   const WORKFLOW_CONTEXT_FORMAT_VERSION = '1.0';
+   const CONTEXT_DELIMITER = '[WORKFLOW_CONTEXT_v1.0]'; // Include version
+   ```
+2. Require explicit opt-in for format changes:
+   - Phase plan must include "Copilot Studio agent re-validation" step
+   - Spike phase to test new format with agent before shipping
+3. Create versioned test suite: `test/fixtures/agent-parsing-tests/format-v1.0.json` with agent responses
+4. Add schema change log: `shared/CONTEXT_FORMAT_CHANGELOG.md` documenting format versions, migration guide
+5. In orchestrator, include format version in context: `{"format_version": "1.0", "context": {...}}`
+6. Return 400 if format version in ConversationStore's `workflow.contextFormatVersion` doesn't match server's format version
+
+**Detection:**
+- Monitor Copilot response mention of context signals: if "I'll enforce the constraint" mentions drop, likely format drift
+- Add telemetry: agent explicitly acknowledges context parsing: `{ context_acknowledged: true/false }` in response
+- Compare workflow decisions before/after format change: similar user input should yield similar agent behavior
+
+**Phase:** Phase 15-16 (Orchestrator). Document format version at schema definition time.
+
+---
+
+### Pitfall 23: Over-Engineered State Machine Complexity
+
+**What goes wrong:**
+- Developer designs 15-state FSM: `idle → collect_email → validate_email → collect_phone → validate_phone → collect_preferences → ... → complete`
+- Each state has entry/exit handlers, error transitions, retry logic, compensation logic
+- After 3 months, business asks for conditional workflows: "if user selects Option A, skip phone collection"
+- Adding one conditional branch requires rebuilding half the state machine
+- Code becomes unmaintainable: 500 lines to add a new state, 30-40 transition cases to consider
+- Debugging requires tracing through all entry/exit handlers to understand control flow
+
+**Why it happens:**
+- FSM pattern is powerful for small, deterministic workflows but scales poorly
+- Milestone says workflow flow is "AI-driven" (not hardcoded) but developer default-implements FSM first
+- Existing ConversationStore patterns encourage storing discrete `status` field (idle/active/completed), feels like FSM
+- No guidance on complexity thresholds: "when should I stop adding states and refactor?"
+
+**Consequences:**
+- Team velocity slows: developers spend more time maintaining state machine than adding features
+- Bug surface area explodes: n states × m transitions = O(n×m) edge cases
+- Testing becomes brittle: mock all state transitions, test count explodes without catching actual issues
+- Workflow flexibility decreases: system can't adapt easily to new business requirements
+
+**Prevention:**
+1. Design orchestrator as **step executor** not state machine:
+   ```typescript
+   type WorkflowStep = {
+     name: string;
+     execute: (context: WorkflowContext) => Promise<StepResult>;
+     nextSteps: (result: StepResult) => string[]; // Returns names of possible next steps
+   };
+   ```
+2. Implement **single-responsibility steps**: each step does ONE thing (collect data, validate, recommend, etc.)
+3. Use step registry: `const steps = new Map<string, WorkflowStep>()` — dynamic step lookup, no hardcoded transitions
+4. Delegate transition logic to AI (per milestone): Copilot decides next step based on available steps, results, constraints
+5. Keep state minimal: only store `currentStep`, `collectedData`, `lastResult` — not full state machine graph
+6. Limit nesting: if you have substeps within substeps, refactor to separate top-level steps
+7. Cap step count: > 20 steps in a single workflow likely over-engineered
+
+**Detection:**
+- Code metric: count conditional branches in state transition logic. If > 50, refactor.
+- Test metric: number of unit tests for orchestrator. If > 200 tests for < 100 lines of code, likely over-engineered.
+- Review metric: average PR size for orchestrator changes. If > 500 lines, likely touching too many transitions.
+
+**Phase:** Phase 15 (Orchestrator Engine). Design step executor early to prevent FSM creep.
+
+---
+
+### Pitfall 24: Backward Compatibility Break in NormalizedMessage or ExtractedPayload Schema
+
+**What goes wrong:**
+- v1.4 ConversationStore deserialization adds new optional field to StoredConversation: `contextFormatVersion?: string`
+- v1.5 parser expects `ExtractedPayload` to always have `confidence` field (was optional in v1.3b)
+- Existing conversations loaded from Redis have `extractedPayload: { data: { ... } }` without `confidence`
+- Zod schema parse fails: `confidence is required` error on 1000s of existing conversations
+- `/api/chat/send` fails with 500 for every existing conversation
+
+**Why it happens:**
+- v1.4's `StoredConversation` successfully uses backward-compat defaults (new fields get defaults, old records deserialize)
+- Expectation carries to v1.5: "we can add new fields without breaking old data"
+- But Parser changes from _extracting_ data (v1.3b) to _validating_ extracted data (v1.5) with stricter schema
+- No validation of schema changes against production data before shipping
+- Rolling back is risky: already changed Copilot Studio agent to expect new format
+
+**Consequences:**
+- All chat routes return 500 for existing users
+- Data migration required BEFORE code deploy: scan all Redis conversations, update records
+- Rollback nearly impossible: downgrade app, but data already migrated
+- Customer-facing outage: existing conversations broken
+
+**Prevention:**
+1. Create schema versioning utility in shared/:
+   ```typescript
+   const ExtractedPayloadV1 = z.object({...}); // Old schema, may be incomplete
+   const ExtractedPayloadV2 = z.object({...}); // New schema, stricter
+
+   const parseExtractedPayload = (data: unknown, version: number = 1) => {
+     if (version === 1) return ExtractedPayloadV1.parseAsync(data);
+     if (version === 2) return ExtractedPayloadV2.parseAsync(data);
+   };
+   ```
+2. Add `schemaVersion` to every schema record:
+   ```typescript
+   const StoredConversation = z.object({
+     schemaVersion: z.literal(2).default(2),
+     messages: NormalizedMessage.array(),
+     // ...
+   });
+   ```
+3. Implement migration on read:
+   ```typescript
+   const stored = rawData as Record<string, unknown>;
+   const schemaVersion = stored.schemaVersion ?? 1; // Default old records to v1
+   if (schemaVersion < 2) {
+     stored.extractedPayload = migrateExtractedPayload(stored.extractedPayload, 1, 2);
+     stored.schemaVersion = 2;
+   }
+   ```
+4. Test schema changes against real production data snapshot:
+   - Export sample of 100 conversations from production Redis (or ioredis-mock)
+   - Run new Zod schema against them
+   - Ensure zero parse errors before shipping
+5. Never remove required fields — only add optional fields or create new schema versions
+
+**Detection:**
+- On boot, parse a sample of stored conversations: `Promise.all(sampleIds.map(id => store.get(id)))`
+- If any fail, log ERROR and don't start server
+- Include schema validation in health check: `GET /health` returns `schemaValidationErrors: number`
+
+**Phase:** Phase 15 (Orchestrator Engine). Schema validation must be part of definition process.
+
+---
+
+### Pitfall 25: Redis Lock Timeout Too Short → Partial State Writes
+
+**What goes wrong:**
+- Orchestrator acquires lock with 2-second timeout
+- Copilot SDK request takes 1.5 seconds, parsing takes 400ms, state write takes 200ms = 2.1 seconds total
+- Lock expires at 2s mark while step 4 (state write) is in progress
+- Concurrent request acquires lock, reads stale state
+- Both requests complete successfully but state is inconsistent
+
+**Why it happens:**
+- v1.3b measurements showed latencies: 200ms startConversation, 300-400ms sendMessage, 500-800ms round-trip
+- But measurements were under controlled conditions (low concurrency, no network jitter)
+- Production has variable latencies: occasionally 2-3 second SDK calls
+- Developer picks "safe" 2s timeout without accounting for tail latencies
+
+**Consequences:**
+- Intermittent state corruption (only happens under high load or network latency)
+- Nearly impossible to reproduce locally (timing-sensitive)
+- Workflow state becomes unreliable
+- Data corruption silent (not a hard error, just wrong state)
+
+**Prevention:**
+1. Set lock timeout dynamically based on observed latencies:
+   ```typescript
+   const p99LockDuration = observeOrchestratorDuration('p99'); // Track in metrics
+   const lockTimeoutMs = p99LockDuration + 3000; // P99 + 3s safety margin
+   ```
+2. Measure Copilot latency in production: tag each request with `sdkLatencyMs`, `parseLatencyMs`, `stateWriteLatencyMs`
+3. Implement _lease-based_ lock instead of time-based:
+   ```typescript
+   const leaseToken = uuid();
+   await redis.set(`lock:${conversationId}`, leaseToken, 'NX', 'EX', 10);
+
+   // Periodically extend lease if still needed:
+   setInterval(() => {
+     redis.getdel(`lock:${conversationId}`).then((current) => {
+       if (current === leaseToken) redis.set(`lock:${conversationId}`, leaseToken, 'EX', 10);
+     });
+   }, 5000);
+
+   // Before write, verify lock still held:
+   const stillHeld = await redis.get(`lock:${conversationId}`) === leaseToken;
+   if (!stillHeld) throw new Error('Lost lock, cannot write state');
+   ```
+4. Always verify lock ownership before writes:
+   ```typescript
+   const ownsLock = (token: string) => redis.call('GET', `lock:${conversationId}`) === token;
+   if (!ownsLock(leaseToken)) throw new Error('Lock lost during execution');
+   ```
+5. Use Lua script for atomic lock-and-write:
+   ```lua
+   if redis.call('GET', KEYS[1]) == ARGV[1] then
+     return redis.call('SET', KEYS[2], ARGV[2])
+   else
+     return nil
+   end
+   ```
+
+**Detection:**
+- Monitor lock contention: `redis.lock_acquisitions_count`, `redis.lock_timeouts_count`
+- If timeout rate > 1%, increase timeout
+- Add assertion to state writes: verify lock token before commit, abort with error if lost
+- Log all lock acquisitions and releases with timestamps to correlate failures
+
+**Phase:** Phase 15 (Orchestrator Engine). Must be designed in at locking layer.
+
+---
+
+### Pitfall 26: Parser Handles Different Copilot Response Strategies Inconsistently
+
+**What goes wrong:**
+- Copilot returns structured output in three ways (v1.3b): Activity.value (highest priority), Activity.entities, text-embedded JSON
+- Parser extracts from value successfully (finds recommendation)
+- Next request, Copilot returns same data in entities field instead (agent refactored)
+- Parser code path for entities has a bug: doesn't extract the same fields as value path
+- One request succeeds, next fails, data inconsistency
+
+**Why it happens:**
+- v1.3b priority-chain extraction was pragmatic for live agent validation, but creates multiple code paths
+- Each code path (value vs entities vs text) likely has slightly different parsing logic
+- Testing covers each path independently but not consistency across paths
+- Copilot agent can change which field it populates without client knowing
+
+**Consequences:**
+- Same user input yields inconsistent parsing results
+- collectedData becomes unreliable: some fields extracted from value, some from entities
+- Workflow decisions based on collectedData become inconsistent
+- Data quality issues hard to debug: need to compare Copilot responses across different extraction paths
+
+**Prevention:**
+1. Normalize all extraction paths to a single structure early:
+   ```typescript
+   // Extract from ANY source, normalize to canonical structure
+   const extractRaw = (activity: Activity): unknown => {
+     if (activity.value !== undefined) return activity.value;
+     if (activity.entities && activity.entities.length > 0) {
+       return Object.fromEntries(activity.entities.map(e => [e.name, e.value]));
+     }
+     // Try text embedding last
+     const match = activity.text?.match(/\{.*\}/); // Very naive
+     return match ? JSON.parse(match[0]) : null;
+   };
+
+   const canonicalData = extractRaw(activity);
+   // Now all three paths feed same data into single validation pipeline
+   ```
+2. Create unified Zod schema for extracted payload (regardless of source):
+   ```typescript
+   const ExtractedData = z.object({
+     recommendation: z.string().optional(),
+     nextStep: z.string().optional(),
+     confidence: z.number().default(0.5),
+   });
+   ```
+3. Test consistency: for each test case, mock Copilot response in all three formats, verify same parse result
+4. Log which strategy succeeded: `{ extraction_strategy: 'activity_value' | 'entities' | 'text_embedded', extracted_fields: [...] }`
+5. Monitor success rate by strategy: if one path drops < 80%, trigger alert
+
+**Detection:**
+- Track extraction path success rates: `parser.extract_by_strategy.activity_value = 95%`, `parser.extract_by_strategy.entities = 75%`
+- If variance > 20%, likely inconsistent logic
+- Compare collectedData across different extraction paths for same user input (in tests)
+
+**Phase:** Phase 16 (Structured Output Parser). Design unified extraction pipeline early.
+
+---
+
+### Pitfall 27: Workflow Context Injection Bloats Message Token Count
+
+**What goes wrong:**
+- Context builder creates `[WORKFLOW_CONTEXT] { step: 'collect_email', constraints: [...], collectedData: {...} }` prefix
+- Prefix is ~500-1000 tokens
+- User asks 20-turn conversation, each turn gets prefix injected, context is bloated
+- Message count in Redis grows but token efficiency drops
+- Copilot sees more tokens dedicated to housekeeping than user intent
+
+**Why it happens:**
+- v1.3b format is optimized for human readability ([WORKFLOW_CONTEXT] delimiter), not compression
+- Milestone allows configurable context builder, but doesn't provide compression option
+- No token counting at build time — developer doesn't see the cost
+
+**Consequences:**
+- Slower Copilot responses (more tokens to process)
+- Higher latency and cost
+- Less room for user message history (if context window fills faster)
+
+**Prevention:**
+1. Implement token budgeting in context builder:
+   ```typescript
+   type ContextBuilderConfig = {
+     format: 'verbose' | 'compact' | 'minimal';
+     includeFullCollectedData: boolean; // vs. keys only
+     includeFullHistory: boolean; // vs. last N turns
+   };
+   ```
+2. Compact format: `[WC] step:email constraints:... data:email,...` (abbreviate field names)
+3. Measure: log token count before/after context injection
+4. Test: benchmark Copilot response time with verbose vs. compact context
+5. Default to compact format for production, verbose for debug mode
+
+**Detection:**
+- Log context token count on every orchestrator call
+- Alert if mean context size > 1500 tokens
+
+**Phase:** Phase 15 (Orchestrator Engine). Consider during context builder design.
+
+---
+
+### Pitfall 28: Conversions Between WorkflowState and NormalizedMessage lose data
+
+**What goes wrong:**
+- NormalizedMessage stores `extractedPayload?: ExtractedPayload`
+- WorkflowState stores `collectedData: Record<string, unknown>`
+- Conversion between them (to update state after extraction) loses metadata
+- extractedPayload.confidence is not reflected in collectedData
+- extractedPayload.source (which field it came from) is lost
+- Downstream step can't tell if data is high-confidence or low-confidence
+
+**Why it happens:**
+- v1.4 NormalizedMessage was designed for conversation history (text messages + cards)
+- v1.5 WorkflowState is designed for step execution and data accumulation
+- No unified schema for extracted data across message boundary — both store "extracted data" but with different fields
+
+**Consequences:**
+- Workflow decisions degrade: step handler can't distinguish high-confidence from low-confidence data
+- Debugging is confusing: collectedData doesn't match extractedPayload in source conversation
+
+**Prevention:**
+1. Create unified schema:
+   ```typescript
+   const CollectedDataEntry = z.object({
+     key: z.string(),
+     value: z.unknown(),
+     source: z.enum(['activity_value', 'entities', 'text_embedded']),
+     confidence: z.number().default(0.5),
+     extractedAt: z.string().datetime(),
+     messageId: z.string(), // Link back to source message
+   });
+
+   const WorkflowState = z.object({
+     collectedData: CollectedDataEntry.array(),
+     // ...
+   });
+   ```
+2. Always convert through schema: extractedPayload → CollectedDataEntry[] → WorkflowState.collectedData
+3. Update NormalizedMessage to include source reference for traced extraction
+
+**Detection:**
+- Compare extractedPayload.confidence vs. collectedData[same_key].confidence — should match
+- Track message IDs through collectedData entries — verify traceability
+
+**Phase:** Phase 15-16. Define schema boundaries clearly upfront.
+
+---
+
+### Pitfall 29: No Monitoring for Workflow State Divergence
+
+**What goes wrong:**
+- Two systems with different views of workflow state:
+  1. ConversationStore in Redis (source of truth): `{ currentStep: 'collect_phone', turnCount: 8 }`
+  2. Client-side state from last response: `{ currentStep: 'collect_phone', turnCount: 7 }`
+- Requests continue, but state is silently out of sync
+- No alerting, no warning, just degraded behavior
+
+**Why it happens:**
+- Milestone doesn't mandate periodic state validation checks
+- No endpoint to compare client state vs. server state
+- Logs don't highlight state divergence (would require computing expected vs. actual)
+
+**Consequences:**
+- Hard to detect in production (only visible through user confusion reports)
+- Accumulates over time (more requests = more chance of divergence)
+- Debugging requires comparing logs and Redis snapshots manually
+
+**Prevention:**
+1. Add state validation endpoint:
+   ```typescript
+   GET /api/chat/:conversationId/state
+   {
+     storedState: WorkflowState,
+     computedState: WorkflowState, // Computed from message history + step handlers
+     divergence: { field: 'turnCount', stored: 8, computed: 9 },
+   }
+   ```
+2. Log state on every orchestrator write:
+   ```typescript
+   logger.info('Workflow state update', {
+     conversationId,
+     previousState: oldState,
+     newState: newState,
+     delta: { turnCount: oldState.turnCount - newState.turnCount },
+   });
+   ```
+3. Implement periodic validation: every 100 requests, verify stored state matches computed state
+4. Return state in response: `/api/chat/send` includes current `workflowState` so client can validate next request
+
+**Detection:**
+- Implement state hash: hash the workflowState object, include in response
+- Client must include hash of last known state in next request
+- Server recomputes hash of stored state, compares — mismatch indicates divergence
+- Log all divergences with full context
+
+**Phase:** Phase 16 (Orchestrator). Add validation early to detect bugs quickly.
+
+---
+
+## Phase-Specific Warnings for v1.5
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---|---|
+| **Phase 15: Orchestrator Engine** | Race conditions (Pitfall 18) | Implement per-conversation Redis lock BEFORE coding orchestrator steps |
+| **Phase 15: Orchestrator Engine** | Over-engineered state machine (Pitfall 23) | Design step executor pattern, cap states at 20 |
+| **Phase 15: Orchestrator Engine** | Idempotency failures (Pitfall 21) | Add idempotency key tracking to StoredConversation upfront |
+| **Phase 15: Orchestrator Engine** | Lock timeout issues (Pitfall 25) | Use dynamic timeout based on observed latencies + lease pattern |
+| **Phase 15: Orchestrator Engine** | Token bloat (Pitfall 27) | Add context token logging, implement compact format option |
+| **Phase 16: Context Builder** | Context window overflow (Pitfall 19) | Implement token budgeting before context injection, test with real Copilot SDK |
+| **Phase 16: Context Builder** | Format drift (Pitfall 22) | Lock format version in schema, require explicit Copilot agent re-validation on changes |
+| **Phase 16: Structured Output Parser** | Parser brittleness (Pitfall 20) | Distinguish parse_error from unstructured, store real Copilot responses in test fixtures |
+| **Phase 16: Structured Output Parser** | Inconsistent extraction paths (Pitfall 26) | Normalize all extraction sources to single pipeline, test all paths for consistency |
+| **Phase 16: Structured Output Parser** | Schema compatibility (Pitfall 24) | Validate schema changes against production data snapshot before shipping |
+| **Phase 17: API Route Updates** | NormalizedMessage/WorkflowState boundary (Pitfall 28) | Define unified CollectedDataEntry schema crossing boundary |
+| **Phase 17: API Route Updates** | Backward compatibility (Pitfall 24) | Add schemaVersion to all records, implement read-time migration |
+| **Throughout** | State divergence (Pitfall 29) | Add state validation endpoint, return state in responses, periodic verification |
+
+---
+
+## Integration Pitfalls with Existing v1.4 Components
+
+### Parser ↔ ActivityNormalizer
+
+**Issue:** activityNormalizer (v1.3b) extracts to ExtractedPayload, v1.5 parser may re-parse the same data
+- **Prevention:** Parser should reuse extracted data from NormalizedMessage.extractedPayload when available, avoid re-parsing
+- **Detection:** Log when parser processes same message twice; metrics for extraction cache hit rate
+
+### Orchestrator ↔ ConversationStore
+
+**Issue:** ConversationStore operations (SET + ZADD + EXPIRE pipeline) are atomic, but orchestrator performs 5+ operations (read, context build, send, parse, write state)
+- **Prevention:** Wrap orchestrator operations in per-conversation lock, treat as single unit
+- **Detection:** Monitor lock contention metrics, alert on > 5% timeout rate
+
+### Orchestrator ↔ CopilotStudioClient Singleton
+
+**Issue:** CopilotStudioClient maintains internal conversation state; orchestrator also tracks state in Redis
+- **Prevention:** CopilotStudioClient is owned by Copilot SDK; don't duplicate state tracking in Redis. Redis stores user-visible state only.
+- **Detection:** If CopilotStudioClient internal state diverges from Redis, SDK calls will fail; monitor SDK error rates
+
+### WorkflowContext Injection ↔ Existing Message Normalization
+
+**Issue:** workflowContext is injected as prefix to each sendMessage call, but normalizer doesn't extract it back out
+- **Prevention:** Injection is transparent to user (not stored, not shown). Normalizer can ignore it.
+- **Detection:** If normalizer sees [WORKFLOW_CONTEXT] in messages, log WARNING (injection leaking to user)
+
+---
+
+## Backward Compatibility Considerations
+
+**Existing records before v1.5:**
+- ConversationStore from v1.4 may lack `workflowState` field
+- NormalizedMessages may lack `extractedPayload` field
+- No `idempotencyKeys` tracking in old conversations
+
+**Migration strategy:**
+1. Add `workflowState?: WorkflowState` optional to StoredConversation (defaults to null)
+2. On first orchestrator call for old conversation, initialize workflowState to initial state
+3. Don't try to retroactively extract from old messages — start extraction on v1.5 onwards
+4. Accept that old conversations won't have rich workflow history; new conversations will
+
+**Testing:**
+- Load sample v1.4 conversations from backup, verify they deserialize and work with v1.5 orchestrator
+- Verify no 500 errors on old conversations
+
+---
+
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
@@ -656,145 +1358,9 @@ Phase 1 (Store factory). Explicitly document: "Primary store is [Redis|InMemory]
 | Fail-open auth stubs | Easier local development | Entire API is unauthenticated if deployed by mistake | Only with a feature-flag guard and `NODE_ENV !== 'production'` enforcement |
 | Inline Copilot SDK calls in route handlers | Faster to write | No abstraction = cannot test without real Copilot Studio connection | Never — wrap SDK in a service class mockable in unit tests |
 | Silent fallback when Redis unavailable | Simplifies error handling in dev | Production loses data; users see stale conversations | Never — fail loud with 503 |
-
----
-
-## Integration Gotchas
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Copilot Studio SDK (`@microsoft/agents-copilotstudio-client`) | Passing `agentIdentifier` (deprecated) instead of `schemaName` | Always use `schemaName` from Settings > Advanced > Metadata |
-| Copilot Studio SDK | Using `directConnectUrl` and also passing `environmentId`/`schemaName` — when `directConnectUrl` is provided, all other settings are ignored | Use one configuration approach; document which is active |
-| Copilot Studio Web Channel Security | Leaving "Require secured access" disabled after enabling it — propagation takes up to 2 hours; old setting remains active during propagation window | Plan security enablement during low-traffic windows; test after full propagation |
-| DirectLine token refresh | Token expires in 1800 s (30 min). If the server does not refresh it before expiry, mid-conversation sends return 401. Expired tokens cannot be refreshed — a new token (new conversation) is required | Implement token refresh on a 25-minute timer or before each send if `expires_at` is within 5 minutes |
-| Adaptive Cards `adaptivecards-react` | Missing `swiper` peer dependency causes "Module not found" build error | `npm install adaptivecards-react swiper` — add both to `client/package.json` |
-| Zod shared schema | Multiple Zod instances from workspace hoisting breaks `instanceof ZodError` | Single Zod source in `shared/`; verify with `npm ls zod` |
-| MSAL OBO flow | Passing ID token instead of access token to `acquireTokenOnBehalfOf` | Validate that the token passed to OBO has `aud` matching the API's `clientId`, not the client app's `clientId` |
-| MSAL OBO flow | Using `/common` authority breaks OBO for guest users | Always target the specific tenant: `https://login.microsoftonline.com/{tenantId}` |
-| Azure Redis TLS | Use `redis://` + port 6379 instead of `rediss://` + 6380 | Always use `rediss://` and port 6380; set `tls: { servername: host }` in ioredis config |
-| Conversation State | Store `sdkConversationRef` directly in Redis | Store only `conversationId` string; reconstruct ref from ID if needed |
-| Message Timestamps | Serialize Date objects (become ISO strings) | Store as Unix milliseconds (number) or use Zod coercion to re-parse |
-| User-Scoped Queries | Create sorted set index for every query | Add index only if you measure a query bottleneck; start with key scans |
-| Fallback Strategy | Silently return in-memory data when Redis fails | Return 503 explicitly; log error; never hide Redis failures |
-
----
-
-## Performance Traps
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Re-rendering full card list on every new message | Chat stutters as conversation grows; old cards flicker | Memoize each card component with `React.memo`; key cards by a stable `activityId`, not array index | Noticeable at ~20 messages in the transcript |
-| Polling or long-polling for Copilot responses instead of streaming | Response latency doubles; server load increases; user experience degrades | Use the SDK's async iterator / streaming activity model from the start | Immediately visible to users on slow agents (>2s response) |
-| Loading the full Adaptive Cards JS bundle unconditionally | Initial page load is slow even before any card is shown | Lazy-import `adaptivecards-react` with `React.lazy` + `Suspense` — load only when first card arrives | Bundle size ~300KB gzipped; noticeable on mobile/slow connections |
-| Storing full activity JSON in React state for every turn | Memory grows unbounded in long conversations | Store only the normalised message schema (not raw SDK activities); implement a transcript window limit | Becomes a memory issue at ~100 turns |
-| Connection pool exhaustion | Latency spikes to 30s+, "timeout" errors | Configure pool size = expected concurrent users * 2; load test | >100 concurrent users or slow upstream |
-| TTL-only consistency | Stale data persists until expiry; "key not found" surprises | Extend TTL atomically with GETEX; store expiresAt timestamp in doc | Heavy load or long TTLs (24h+) |
-| Index scan is O(N) | Listing all conversations for user gets slow | Don't scan thousands of keys in-memory; use sorted set index with ZRANGE | User with >100 conversations |
-| Serialization overhead | Every message write is 2x slower | Use efficient serialization (JSON is fine; avoid pickling); consider MessagePack for large payloads | Conversations with 1000+ messages |
-| Memory fragmentation | Redis memory usage stays high even after deletes | Set appropriate eviction policy (allkeys-lru) and TTL; monitor memory growth | Long-lived conversations without TTL |
-
----
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|-----------|
-| DirectLine secret in any `VITE_*` env var | Secret exposed to all users via JS bundle; permanent channel access for attacker | Secret lives only in `server/.env`; never in `client/.env` |
-| Forwarding raw card action payload from client to Copilot Studio | Arbitrary data injection into agent flows; potential to trigger unintended actions | Parse and validate against Zod schema in `shared/`; construct new payload from validated fields |
-| `Action.OpenUrl` domain allowlist not enforced | Phishing / open redirect via card button | Validate URL hostname against an allowlist on the server before allowing card action |
-| Auth stub set to fail-open in production | Entire API accessible without authentication | `AUTH_REQUIRED=true` default; fail-open only when explicitly disabled via env var; CI check |
-| No CSRF protection on card action endpoint | Cross-site request forgery on authenticated card submissions | Validate `Origin` header matches allowed origins; use `SameSite=Strict` cookies if session cookies are in use |
-| Trusting Adaptive Cards client-side `isRequired` / `regex` validation | Any crafted HTTP request bypasses browser validation entirely | Duplicate all validation server-side with Zod; treat card submissions as untrusted user input |
-| Storing credentials in Redis | If Redis is breached, secrets are exposed | Never store COPILOT_CLIENT_ID or JWT secrets in Redis; only cache user tokens briefly (TTL 5min) with key prefix like `cache:jwt:{userId}` |
-| Skipping TLS on Azure | Network traffic is unencrypted (man-in-the-middle possible) | Always use `rediss://` on Azure; set `tls: true` in ioredis |
-| No authentication on Redis | Unauthenticated access from network | Always set `password` in Redis config; use `AUTH <password>` command |
-| Persisting user PII | Privacy risk; GDPR/CCPA violation | Don't store email, phone, SSN in Redis; only store conversationId, userId (opaque), timestamp |
-| Accepting arbitrary JSON from user | Code injection, prototype pollution | Validate all deserialized data with Zod; never `eval()` or `Function()` on Redis data |
-
----
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| No optimistic user message bubble | Chat feels unresponsive; user does not know if Send was received | Show a user bubble immediately on send (optimistic); mark it pending; replace with confirmed message on response |
-| Card remains interactive after Submit | Duplicate submissions; user confusion about whether form was submitted | Immediately disable all card inputs and show a spinner after first Submit click; re-enable on error |
-| Generic error messages ("Something went wrong") | User cannot determine if they should retry, refresh, or report an issue | Map error types to actionable messages: network error → "Check your connection, try again"; 401 → "Session expired, refresh page"; 429 → "Too many requests, wait a moment" |
-| `fallbackText` rendered as plain text for unsupported cards | User sees raw card description text, no understanding of why form is missing | Detect `fallbackText` rendering and show a contextual error: "This card requires a newer version of the app" |
-| Reduced-motion not respected in loading skeleton / typing indicator | Violates accessibility standards; can cause discomfort for users with vestibular disorders | Check `prefers-reduced-motion` media query; replace animated skeletons with static placeholders when active |
-
----
-
-## "Looks Done But Isn't" Checklist
-
-- [ ] **Card action submit:** Buttons are visible and styled — verify they fire an actual network request by clicking and checking the Network tab. The `dangerouslySetInnerHTML` anti-pattern produces cards that look correct but do nothing.
-- [ ] **Auth middleware:** All endpoints return 200 — verify the middleware rejects a request with no `Authorization` header (should return 401, not 200).
-- [ ] **CORS in production:** API works in `npm run dev` — verify it also works after `npm run build` with the built client served statically (Vite proxy is gone in production).
-- [ ] **Card pending state:** Card disables inputs after Submit — verify by opening DevTools Network throttling to "Slow 3G" and confirming the Submit button is non-interactive while the request is inflight.
-- [ ] **Token refresh:** Conversation works immediately — verify that a conversation started and left idle for 31+ minutes continues to work (token must be refreshed before expiry).
-- [ ] **Schema version:** Cards render with text content — verify that a card using a 1.5-only element (e.g., a Table) renders correctly, not as blank space or `fallbackText`.
-- [ ] **Zod single instance:** Validation errors are caught correctly — run `npm ls zod` from monorepo root and confirm exactly one version at one path.
-- [ ] **No credentials in client bundle:** React app build completed — run `grep -r "COPILOT\|directline\|botframework" dist/` and confirm no SDK secrets or endpoint URLs appear.
-- [ ] **Redis Store Initialized:** Store is created but `connect()` is never called; application proceeds without actual Redis connection.
-- [ ] **Health Check Added:** Endpoint exists but never checked; returns 200 even if Redis is down.
-- [ ] **Fallback Implemented:** In-memory fallback exists but is **silent** (no error, no logging).
-- [ ] **Serialization Tested:** Unit tests exist but don't test round-trip (serialize → deserialize → use).
-- [ ] **TTL Configured:** TTL set to 24h but never tested; edge case of expiry during active session not covered.
-- [ ] **Azure Redis Tested:** Code works with local Redis but never tested against actual Azure Cache.
-- [ ] **Pool Size Documented:** Config exists but no load test to verify pool is sized correctly.
-- [ ] **Conversation Resume Works:** Conversation starts but resuming from Redis after restart is never tested.
-- [ ] **User-Scoped Queries Work:** `listConversationsByUser` works but includes expired conversations.
-- [ ] **Error Handling Explicit:** Store returns errors but routes catch them in a blanket `.catch(err => {...})` that hides the issue.
-
----
-
-## Recovery Strategies
-
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| DirectLine secret exposed in browser | HIGH | Immediately rotate both secrets in Copilot Studio Web Channel Security; update server env vars; redeploy; audit logs for unauthorized conversations |
-| `dangerouslySetInnerHTML` card rendering | MEDIUM | Replace card render component with `adaptivecards-react`; regression-test all existing card templates for action firing |
-| Schema version mismatch causing blank cards | LOW | Add explicit `maxVersion` to renderer HostConfig; add `onParseError` logging; update card templates to target the configured version |
-| Module-level Map conversation state lost on restart | MEDIUM | Implement the store interface (was deferred); swap Map for Redis or a simple SQLite file for persistence; users must restart conversations |
-| Zod dual-instance issue | LOW | Align Zod versions across all `package.json` files; `npm install`; verify with `npm ls zod`; update catch blocks to avoid `instanceof` where necessary |
-| Cors `*` in production | LOW-MEDIUM | Update `ALLOWED_ORIGINS` env var to specific origins; redeploy; no user data is at risk but requests from unauthorised origins were permitted |
-| Silent fallback masked Redis failure; data loss | HIGH | 1. Restore Redis backup. 2. Audit which conversations are missing. 3. Notify affected users. 4. Change strategy to 503 (fail loud). |
-| sdkConversationRef not serializable | HIGH | 1. Delete all stored refs from Redis. 2. Force re-start conversations. 3. Redesign to store only conversationId. 4. Test deserialize → use end-to-end. |
-| Azure Redis TLS misconfigured; connections fail | MEDIUM | 1. Update REDIS_URL to use `rediss://` 2. Restart app. 3. Verify `tls: { servername: ... }` in config. 4. Test against Azure Redis. |
-| Date serialization bug; wrong timestamp sort | MEDIUM | 1. Add Zod coercion for timestamp deserialization. 2. Rebuild Redis keys (export, update, re-import). 3. Test round-trip serialization. |
-| TTL race condition; conversation deleted mid-write | MEDIUM | 1. Use `GETEX` (atomic get + extend TTL). 2. Add expiresAt timestamp in document. 3. Test with 1-second TTL to force race condition. |
-| Pool exhaustion; app becomes unresponsive | MEDIUM | 1. Increase pool size in config. 2. Add request queuing with timeout. 3. Implement circuit breaker. 4. Load test. |
-| Stale data from in-memory fallback | MEDIUM | 1. Flip to Redis-primary (remove dual writes). 2. Monitor Redis success rate. 3. Add test to verify no divergence between stores. |
-| Complex types lost in JSON (Map, Buffer) | LOW | 1. Add Zod coercion for Map (fromEntries) and Buffer (base64). 2. Test round-trip. 3. Update schema in shared/. |
-| ioredis optional dependency missing | LOW | 1. Install ioredis explicitly. 2. Add check in code for missing module with clear error. 3. Update CI/CD to test without ioredis. |
-| Index gets too large; query is slow | LOW | 1. Implement archival (move old conversations to PostgreSQL). 2. Trim Redis index to last 100 conversations per user. 3. Profile query latency. |
-
----
-
-## Pitfall-to-Phase Mapping
-
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| DirectLine secret in browser | Phase 1: Server scaffold | `grep -r "COPILOT" client/` returns nothing; Network tab shows no direct Copilot Studio calls from browser |
-| `dangerouslySetInnerHTML` card rendering | Phase 2: Adaptive Card renderer | Click test on first prototype card — Submit button fires a network request |
-| Schema version mismatch | Phase 2: Adaptive Card renderer | Render a Table element (AC 1.5 only) and confirm it displays |
-| Card action allowlist missing | Phase 2: `/api/chat/card-action` endpoint | Send a crafted POST with an unlisted action type — server must return 400 |
-| Conversation state in process memory | Phase 1: Server scaffold | Stub the store interface; add TODO for production replacement |
-| Fail-open auth stubs | Phase 1: Server scaffold | Unit test that all endpoints return 401 with no Authorization header |
-| Vite proxy CORS gap | Phase 1: Server scaffold + Phase 4: CI | CI job builds and smoke-tests the production bundle with CORS headers |
-| Zod dual-instance | Phase 1: Monorepo setup | `npm ls zod` check in CI; instanceof test in shared validation unit tests |
-| `agentIdentifier` deprecation | Phase 1: SDK integration | ESLint grep rule or CI check; code review checklist item |
-| Duplicate card submissions | Phase 2: Card UI + Phase 2: API layer | Double-submit test: rapid-click Submit and confirm only one request in Network tab |
-| Silent fallback masking failures | Phase 1 (v1.4): Store factory | Return 503 on Redis unavailable; health check endpoint fails when Redis is down; error is logged |
-| Serializing sdkConversationRef | Phase 1 (v1.4): Serialization layer | Deserialize ref, pass to sendMessage(); no type error; end-to-end test with live Copilot |
-| Azure Redis TLS misconfiguration | Phase 1 (v1.4): Store factory | Test against real Azure Cache with rediss://, port 6380; verify connection succeeds |
-| Date serialization becomes string | Phase 1 (v1.4): Serialization layer | Store timestamp, retrieve, verify `instanceof Date` or run through Zod coercion |
-| TTL edge cases (race, stale data) | Phase 1 (v1.4): Store factory | Unit test with 1-second TTL; test GETEX atomicity; verify expiresAt < now check |
-| Connection pool exhaustion | Phase 1 (v1.4): Store factory + Phase 2: Load testing | Simulate 100+ concurrent users; monitor pool size; verify 99th percentile latency <2s |
-| Dual-write consistency (in-memory + Redis) | Phase 1 (v1.4): Store factory | Remove dual writes; pick one store; test failover behavior with Redis unavailable |
-| Complex type serialization (Map, Buffer) | Phase 1 (v1.4): Serialization layer | Test round-trip for any non-primitive types; add Zod coercion |
-| ioredis optional dependency missing | Phase 1 (v1.4): Store factory | Test both paths: with ioredis, without ioredis; clear error message if Redis required but missing |
-| Index write overhead | Phase 3 (v1.4): Optimization (after stable reads) | Add index only if query benchmark shows slowness; profile before and after |
+| Simple orchestrator without per-conversation locks | Faster initial implementation | Race conditions under load | Never — locking must be part of day 1 design |
+| Naive context builder without token budgeting | Simpler initial code | Context overflow + degraded workflow intelligence | Never — token budgeting must be part of day 1 design |
+| Single parser code path (no fallback) | Simpler logic | No passthrough mode if parser fails; entire workflow breaks | Never — must distinguish parse_error from unstructured |
 
 ---
 
@@ -835,8 +1401,31 @@ Phase 1 (Store factory). Explicitly document: "Primary store is [Redis|InMemory]
 - [Connection pools and multiplexing | Redis Docs](https://redis.io/docs/latest/develop/clients/pools-and-muxing/)
 - [How to Scale OpenAI Agents SDK: Redis Session Management for Production](https://llmshowto.com/scaling-openai-agents-sdk)
 
+### Workflow Orchestration and Structured Output Parsing Research (v1.5)
+
+- [Mastering Workflow Orchestration: A Deep Dive into Steps, State Management, and Conditional Logic](https://medium.com/@juanc.olamendy/mastering-workflow-orchestration-a-deep-dive-into-steps-state-management-and-conditional-logic-04b5400398d1)
+- [Mastering Node.js Concurrency: Race Condition Detection and Prevention](https://medium.com/@zuyufmanna/mastering-node-js-concurrency-race-condition-detection-and-prevention-3e0cfb3ccb07)
+- [LLM Output Parsing and Structured Generation Guide](https://tetrate.io/learn/ai/llm-output-parsing-structured-generation)
+- [How To Ensure LLM Output Adheres to a JSON Schema](https://modelmetry.com/blog/how-to-ensure-llm-output-adheres-to-a-json-schema)
+- [The guide to structured outputs and function calling with LLMs](https://agenta.ai/blog/the-guide-to-structured-outputs-and-function-calling-with-llms)
+- [What is idempotency in Redis? Cost-saving patterns for LLM apps](https://redis.io/blog/what-is-idempotency-in-redis/)
+- [Distributed Locks with Redis](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/)
+- [The Twelve Redis Locking Patterns Every Distributed Systems Engineer Should Know](https://medium.com/@navidbarsalari/the-twelve-redis-locking-patterns-every-distributed-systems-engineer-should-know-06f16dfe7375)
+- [Build an Idempotent API in Node.js with Redis](https://blog.appsignal.com/2024/02/14/build-an-idempotent-api-in-nodejs.html)
+- [Context Window Overflow in 2026: Fix LLM Errors Fast](https://redis.io/blog/context-window-overflow/)
+- [LLM Context Window Limitations: Impacts, Risks, and Fixes](https://atlan.com/know/llm-context-window-limitations/)
+- [Top techniques to Manage Context Lengths in LLMs](https://agenta.ai/blog/top-6-techniques-to-manage-context-length-in-llms/)
+- [The Art of API Evolution: How to Version Your APIs without Breaking Client Code](https://medium.com/@rao-harsh/the-art-of-api-evolution-how-to-version-your-apis-without-breaking-client-code-916e74068322)
+- [Workflow Engine vs. State Machine](https://workflowengine.io/blog/workflow-engine-vs-state-machine/)
+- [Why Developers Never Use State Machines](https://workflowengine.io/blog/why-developers-never-use-state-machines/)
+- [Simplifying Complex Workflows: The Power of State Machines in Backend Development](https://medium.com/@raultotocayo/simplifying-complex-workflows-the-power-of-state-machines-in-backend-development-8c09ef877aab)
+- [Explore multi-agent orchestration patterns - Microsoft Copilot Studio](https://learn.microsoft.com/en-us/microsoft-copilot-studio/guidance/multi-agent-patterns)
+- [FAQ for generative orchestration - Microsoft Copilot Studio](https://learn.microsoft.com/en-us/microsoft-copilot-studio/faqs-generative-orchestration)
+- [Multi-Agent Orchestration and more: Copilot Studio announcements — Microsoft Copilot Blog](https://www.microsoft.com/en-us/microsoft-copilot/blog/copilot-studio/multi-agent-orchestration-maker-controls-and-more-microsoft-copilot-studio-announcements-at-microsoft-build-2025/)
+
 ---
 
 *Pitfalls research for: React + Node chat app with Microsoft Copilot Studio SDK + Adaptive Cards (monorepo)*
 *Extended for: v1.4 Redis-backed persistent state store (Azure Cache for Redis)*
-*Researched: 2026-02-19 (original); 2026-02-21 (Redis additions)*
+*Extended for: v1.5 Workflow Orchestrator + Structured Output Parser*
+*Researched: 2026-02-19 (original); 2026-02-21 (Redis additions); 2026-02-21 (Workflow orchestration)*

@@ -1,702 +1,625 @@
-# Architecture: Redis Persistent State Store Integration
+# Architecture: Workflow Orchestrator & Structured Output Parser Integration
 
-**Domain:** Agentic Copilot Chat App (Express + React monorepo)
+**Domain:** Agentic Copilot Chat App – v1.5 Orchestrator & Structured Output Parsing
 **Researched:** 2026-02-21
-**Mode:** Ecosystem + Architecture Integration
-**Confidence:** HIGH
+**Overall Confidence:** HIGH
 
 ---
 
 ## Executive Summary
 
-This research maps the Redis persistent state store integration into the existing Express server architecture. The goal is to replace the in-memory LRU conversation store with a Redis-backed implementation while maintaining backward compatibility and enabling multi-instance scaling for the v1.5 Workflow Orchestrator.
+The Workflow Orchestrator and Structured Output Parser integrate cleanly into the existing Express architecture by:
 
-**Key Finding:** Redis integration follows a **factory pattern** for store selection (Redis vs InMemory), which cleanly isolates Redis complexity behind the existing `ConversationStore` interface. This requires:
+1. **Structured Output Parser** — a new component in `server/src/parser/structuredOutputParser.ts` that wraps and extends the existing `extractStructuredPayload` logic from `activityNormalizer.ts` with multi-strategy parsing, Zod validation, and parsing confidence signals.
 
-1. **Minimal chat route changes** — routes use the abstract interface, never know about Redis
-2. **Expanded StoredConversation schema** — adds userId, tenantId, timestamps, status (in shared/)
-3. **Secondary index via sorted sets** — for user-scoped queries (sorted set on userId+timestamp)
-4. **Health check enhancement** — reports Redis connectivity status
-5. **Graceful failure handling** — returns 503 when Redis unavailable (no silent fallback)
+2. **Workflow Orchestrator** — a stateful service in `server/src/workflow/WorkflowOrchestrator.ts` that orchestrates the conversation flow: enriching queries via context building, sending to Copilot, parsing responses, updating state, and determining next steps.
 
-The architecture preserves all existing Express middleware patterns (auth, orgAllowlist) and maintains the singleton pattern for the store instance, making this a **drop-in replacement** at the integration layer.
+3. **Context Builder** — a utility module in `server/src/workflow/contextBuilder.ts` that enriches outbound messages with workflow state and collectedData, replacing the current inline `buildContextPrefix` in routes.
 
----
+4. **Minimal Route Changes** — existing `/start`, `/send`, and `/card-action` routes are *minimally modified* (not replaced); they add `workflowState` to responses when orchestrator integration is enabled. The `/orchestrate` route remains the primary entry point for stateful workflows.
 
-## Component Architecture
+5. **Store Integration** — both `ConversationStore` (Redis/InMemory) and `WorkflowStateStore` (in-memory for v1.5) are called unchanged. The schema additions in `StoredConversation` (workflowId, currentStep, stepData, metadata) provide optional workflow metadata; old records deserialize without error via Zod `.default()` values.
 
-```
-┌─ Express Server (app.ts) ─────────────────────────────────────────────────┐
-│                                                                             │
-│  CORS → JSON Parser → Health Check (unauthenticated)                       │
-│       ↓                                                                     │
-│  [Auth Middleware] → [Org Allowlist Middleware]                            │
-│       ↓                                                                     │
-│  ┌─ Chat Routes (chat.ts) ──────────────────────────────────────────┐     │
-│  │                                                                   │     │
-│  │  /start    → [Copilot] → StoredConversation → Store.set()        │     │
-│  │  /send     → [Lookup] → [Copilot] → [Normalize] → Store.set()    │     │
-│  │  /card-action → [Validate] → [Copilot] → [Normalize] → Store.set()   │     │
-│  │                                  ↓                                │     │
-│  │                         Store Interface                           │     │
-│  │                              ↓                                    │     │
-│  │         ┌─────────────────────┴────────────────────┐             │     │
-│  │         ↓                                          ↓             │     │
-│  │   RedisStore (new)                       InMemoryStore (legacy)  │     │
-│  │   ├─ ioredis client                       ├─ LRUCache            │     │
-│  │   ├─ JSON serialization                   └─ Synchronous         │     │
-│  │   ├─ Sorted set indexes                                          │     │
-│  │   ├─ TTL management                       Factory Pattern:        │     │
-│  │   └─ Async/await throughout              createStore() → pick    │     │
-│  │                                           one based on env vars   │     │
-│  └─ [Health Check] → Redis.ping() + client.status ────────────────┘     │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-Data Flow Detail:
-  1. Request enters auth middleware (req.user populated)
-  2. Route handler calls Store.get(conversationId)
-  3. Store returns StoredConversation (userId, tenantId, history, etc.)
-  4. Route logic proceeds (lookup complete, always in O(1))
-  5. After Copilot response: Store.set() with updated conversation
-  6. Redis path: async client.json.set() + ZADD (sorted set index)
-  7. Health check probes redis.ping() on-demand
-```
+6. **Backward Compatibility** — passthrough mode is automatic. When no structured output is detected, responses are identical to v1.4 behavior. When workflow context is omitted from request, routes work as before (no context injection).
 
 ---
 
-## New Components
+## Data Flow: Request → Parser → Orchestrator → Store
 
-### 1. **RedisStore Implementation** (`server/src/store/RedisStore.ts`)
+### Current (v1.4) Flow – `/api/chat/send`
 
-**Responsibility:** Implement ConversationStore interface on top of ioredis, managing conversation state with secondary indexes.
+```
+Client POST /api/chat/send
+  ↓
+Auth Middleware (validates JWT, populates req.user)
+  ↓
+Org Allowlist Middleware (filters by tenantId)
+  ↓
+Route Handler (/send in chat.ts):
+  1. Parse request (conversationId, text, optional workflowContext)
+  2. Look up conversation in ConversationStore
+  3. Build outbound message (inline buildContextPrefix if workflowContext present)
+  4. Call copilotClient.sendActivityStreaming(userActivity)
+  5. Normalize activities → NormalizedMessage[] (via activityNormalizer.normalizeActivities)
+     - Inline extractStructuredPayload runs (3-surface priority: value > entities > text)
+  6. Store conversation history + metadata in ConversationStore
+  7. Return { conversationId, messages }
+```
 
-**Key Details:**
+**No structured output parsing beyond extraction.** The `ExtractedPayload` (if present) is bundled into `NormalizedMessage`, but no JSON schema validation, no parsing rules, no workflow state mutations.
 
-- **Constructor:** Accepts ioredis client instance (injected, not created internally)
-- **Data serialization:** `JSON.stringify(StoredConversation)` on write, `JSON.parse()` on read
-- **Keys:** `conversation:{externalId}` (primary), `user:{userId}:{timestamp}:{externalId}` (sorted set index)
-- **Sorted set score:** Timestamp (milliseconds), allows range queries like "all conversations for user in last 7 days"
-- **TTL:** Applied to primary key only (e.g., 30 days expiration), sorted set entries clean up when primary expires
-- **Error handling:** Throws with descriptive messages; app.ts health check catches and returns 503
+### New (v1.5) Flow – `/api/chat/send` + Orchestrator Integration
 
-```typescript
-// Pseudocode structure
-export class RedisStore implements ConversationStore {
-  constructor(private client: Redis) {}
+```
+Client POST /api/chat/send (or POST /api/chat/orchestrate for stateful workflows)
+  ↓
+Auth Middleware → Org Allowlist Middleware
+  ↓
+Route Handler:
+  1. Parse request
+  2. Look up conversation (or start new conversation for /orchestrate)
+  3. [NEW] Load workflowState from WorkflowStateStore (if exists)
+  4. [NEW] Context Builder enriches message with workflowState + collectedData
+  5. Call copilotClient.sendActivityStreaming(enrichedMessage)
+  6. normalizeActivities → NormalizedMessage[] with extractedPayload
+  7. [NEW] Structured Output Parser:
+     - Input: NormalizedMessage[] + extractedPayload surfaces
+     - Strategy 1: Multi-layer JSON parsing (exact, partial, lossy)
+     - Strategy 2: Zod schema validation (if CopilotStructuredOutputSchema provided)
+     - Strategy 3: Confidence scoring (high/medium/low)
+     - Output: ParsedStructuredOutput { schema, validated, confidence, raw, fallback }
+  8. [NEW] Workflow Orchestrator:
+     - Updates workflowState (step, collectedData, turnCount)
+     - Stores in WorkflowStateStore + StoredConversation.stepData
+     - Determines next action (continue, collect_more, error, complete)
+  9. Return response with { conversationId, messages, workflowState, nextAction, ...}
+  10. Store everything in ConversationStore + WorkflowStateStore
+```
 
-  async get(id: string): Promise<StoredConversation | undefined> {
-    const json = await this.client.get(`conversation:${id}`);
-    if (!json) return undefined;
-    return JSON.parse(json);
+---
+
+## Component Boundaries
+
+### Existing Components (No Changes to Core Logic)
+
+| Component | File | Responsibility | Inputs | Outputs |
+|-----------|------|-----------------|--------|---------|
+| **normalizeActivities** | `server/src/normalizer/activityNormalizer.ts` | Convert Copilot SDK Activities → NormalizedMessage[] with extractedPayload | `Activity[]` | `NormalizedMessage[]` (each with optional `extractedPayload: ExtractedPayload`) |
+| **extractStructuredPayload** | (internal to normalizer) | Extract JSON from 3 surfaces (value, entities, text) | `Activity, role` | `ExtractedPayload \| undefined` |
+| **ConversationStore** | `server/src/store/ConversationStore.ts` (interface) | Persistence abstraction | conversation ID, StoredConversation | saved/retrieved record |
+| **WorkflowStateStore** | `server/src/store/WorkflowStateStore.ts` (interface) | Workflow state persistence | conversationId, WorkflowState | saved/retrieved state |
+| **buildContextPrefix** | `server/src/routes/chat.ts` (current) | Format [WORKFLOW_CONTEXT] delimited prefix | `WorkflowContext` | `string` prefix |
+| **CopilotStudioClient** | `server/src/copilot.ts` | Singleton proxy to Copilot SDK | message Activity | streaming Activities |
+
+### New Components (v1.5 Additions)
+
+| Component | File | Responsibility | Inputs | Outputs |
+|-----------|------|-----------------|--------|---------|
+| **StructuredOutputParser** | `server/src/parser/structuredOutputParser.ts` | Multi-strategy JSON parsing + Zod validation | `NormalizedMessage[], CopilotStructuredOutputSchema?` | `ParsedStructuredOutput` { schema, validated, confidence, raw, fallback } |
+| **WorkflowOrchestrator** | `server/src/workflow/WorkflowOrchestrator.ts` | Stateful orchestration: context enrichment, state accumulation, next-step determination | `conversationId, messages, extractedPayload, existingState, schema?` | Updated `WorkflowState`, next action signal (continue/collect/error/complete) |
+| **contextBuilder** | `server/src/workflow/contextBuilder.ts` | Enrich queries with workflow state; replace inline `buildContextPrefix` | `WorkflowState, collectedData, step, constraints` | Enriched message text with [WORKFLOW_CONTEXT] prefix |
+
+### Schema Additions (shared/)
+
+| Schema | File | Purpose |
+|--------|------|---------|
+| **CopilotStructuredOutputSchema** | `shared/src/schemas/workflow.ts` | (NEW) Zod schema describing expected Copilot response structure (e.g., { "recommendation": string, "confidence": number }) |
+| **ParsedStructuredOutput** | `shared/src/schemas/workflow.ts` | (NEW) Result shape from parser: { schema, validated, confidence, raw, fallback } |
+| **StoredConversation** | `shared/src/schemas/storedConversation.ts` | (EXTENDED) Added optional workflowId, currentStep, stepData, metadata; backward compatible |
+| **WorkflowState** | `shared/src/schemas/workflowState.ts` | (EXISTING, used) Multi-turn state: step, collectedData, lastRecommendation, turnCount |
+| **WorkflowContext** | `shared/src/schemas/workflowContext.ts` | (EXISTING, used) Context injection payload: step, constraints, collectedData |
+
+---
+
+## New vs. Modified Components Explicit
+
+### STAYS UNCHANGED ✓
+
+- `server/src/copilot.ts` — CopilotStudioClient singleton
+- `server/src/normalizer/activityNormalizer.ts` — normalizeActivities, extractStructuredPayload (logic reused, not modified)
+- `server/src/store/ConversationStore.ts` — interface unchanged; implementations (InMemory, Redis) work as-is
+- `server/src/store/factory.ts` — factory logic unchanged
+- `server/src/middleware/auth.ts` — authentication unchanged
+- `server/src/middleware/orgAllowlist.ts` — authorization unchanged
+- `server/src/allowlist/cardActionAllowlist.ts` — action validation unchanged
+- Existing schemas: `WorkflowContext`, `WorkflowState` (already present)
+
+### MINIMALLY MODIFIED (Backward Compatible)
+
+**`server/src/routes/chat.ts`**
+- `/start`: Add optional `workflowState` to response (only if orchestrator flag enabled)
+- `/send`: Add optional `workflowState` to response
+- `/card-action`: Add optional `workflowState` to response
+- Move `buildContextPrefix` → `contextBuilder` module (internal refactor, same logic)
+- Call orchestrator for state mutation (optional, backward-compatible)
+
+**`server/src/routes/orchestrate.ts`**
+- Already exists; extend to call new parser and orchestrator
+- Keep batteries-included single-call design (start → send → parse → orchestrate)
+
+**`shared/src/schemas/api.ts`**
+- Extend `SendMessageResponse`, `CardActionResponse`, `OrchestrateResponse` to include optional `workflowState`
+- Add new response shape for parser results (if exposed via API)
+
+**`shared/src/schemas/storedConversation.ts`**
+- Already extended (v1.4) with optional `workflowId, currentStep, stepData, metadata`
+- Already backward compatible via Zod `.default()` values
+
+### NEWLY CREATED
+
+1. **`server/src/parser/structuredOutputParser.ts`**
+   - Class: `StructuredOutputParser`
+   - Method: `parse(messages: NormalizedMessage[], schema?: ZodSchema): Promise<ParsedStructuredOutput>`
+   - Strategies:
+     - Exact match: JSON must fully conform to schema
+     - Partial match: Extract subset of fields from loose JSON
+     - Lossy fallback: Use raw JSON as-is with low confidence
+   - Returns: `ParsedStructuredOutput` with validated, raw, confidence, fallback metadata
+
+2. **`server/src/workflow/WorkflowOrchestrator.ts`**
+   - Class: `WorkflowOrchestrator`
+   - Constructor: Takes `conversationStore`, `workflowStateStore`, `parser`
+   - Methods:
+     - `orchestrate(conversationId, messages, extractedPayload, existingState, schema)`: Updates state, determines next action
+     - `updateState(state, extractedPayload)`: Mutations (collectedData, lastRecommendation, turnCount)
+     - `determineNextAction(state, parsed, rules)`: YES/NO/MAYBE on continue, collect_more, error, complete
+   - Returns: `{ updatedState, nextAction, reason, confidence }`
+
+3. **`server/src/workflow/contextBuilder.ts`**
+   - Function: `enrichContextForMessage(baseMessage, workflowState, collectedData, step, constraints): string`
+   - Replaces inline `buildContextPrefix` logic
+   - Returns formatted [WORKFLOW_CONTEXT] prefix
+   - Testable in isolation
+
+4. **`shared/src/schemas/workflow.ts`** (NEW)
+   - `CopilotStructuredOutputSchema` — user-defined schema for Copilot's expected response
+   - `ParsedStructuredOutput` — parser output shape
+   - `NextAction` — enum: 'continue' | 'collect_more' | 'error' | 'complete'
+
+---
+
+## Data Flow: End-to-End Trace
+
+### Scenario: Multi-turn Workflow (3-step form)
+
+**Turn 1: `/api/chat/orchestrate`**
+
+```
+Request:
+{
+  "query": "I need help with my account",
+  "workflowContext": { "step": "identify_issue", "constraints": ["no_financial_data"], "collectedData": {} }
+}
+
+Route Handler (orchestrate.ts):
+1. Parse request → { query, workflowContext }
+2. startConversationStreaming() → collect initial greeting
+3. Load workflowState from store (first time: undefined) → use defaults
+4. ContextBuilder.enrichContextForMessage(query, state, collectedData) → prepend [WORKFLOW_CONTEXT]
+5. sendActivityStreaming(enriched) → collect Copilot response
+6. normalizeActivities() → NormalizedMessage[] with extractedPayload
+7. StructuredOutputParser.parse(messages, schema?) → ParsedStructuredOutput
+   - Input: [ { kind: 'text', text: '{"issue": "login_problem", "severity": "high"}' } ]
+   - Strategy: Exact match against { issue: string, severity: string }
+   - Output: { schema: matched, validated: {...}, confidence: 'high', raw: {...} }
+8. WorkflowOrchestrator.orchestrate(...):
+   - Update state.collectedData["issue"] = "login_problem"
+   - Set state.lastRecommendation = "identify_issue complete"
+   - Increment state.turnCount = 1
+   - nextAction = 'continue' (move to next step)
+9. Store conversation + state
+10. Response:
+{
+  "conversationId": "abc-123",
+  "messages": [...],
+  "extractedPayload": { "source": "text", "confidence": "high", "data": {...} },
+  "latencyMs": 450,
+  "workflowState": { "step": "collect_recovery_email", "collectedData": {...}, "turnCount": 1 },
+  "nextAction": "continue"
+}
+
+Turn 2: Client sees nextAction='continue', UI moves to recovery email collection step
+POST /api/chat/send:
+{
+  "conversationId": "abc-123",
+  "text": "My recovery email is user@example.com",
+  "workflowContext": {
+    "step": "collect_recovery_email",
+    "constraints": ["email_format_only"],
+    "collectedData": { "issue": "login_problem", "severity": "high" }
   }
+}
 
-  async set(id: string, conv: StoredConversation): Promise<void> {
-    const json = JSON.stringify(conv);
-    await this.client.set(
-      `conversation:${id}`,
-      json,
-      'EX', // EX = expiry in seconds
-      30 * 24 * 60 * 60, // 30 days
-    );
-    // Secondary index: sorted set on userId
-    if (conv.userId) {
-      const score = conv.createdAt ?? Date.now(); // Timestamp as score
-      const member = `${conv.externalId}`;
-      await this.client.zadd(
-        `user:${conv.userId}:conversations`,
-        score,
-        member,
-      );
-    }
-  }
+Route Handler (/send in chat.ts):
+1. Parse request
+2. conversationStore.get("abc-123") → { userId, tenantId, history, ... }
+3. Load workflowState from store → { step: "collect_recovery_email", collectedData: {...}, turnCount: 1 }
+4. ContextBuilder.enrichContextForMessage(text, state) → prepend context
+5. sendActivityStreaming(enriched) → Copilot response
+6. normalizeActivities() → messages[]
+7. StructuredOutputParser.parse(messages) → ParsedStructuredOutput
+8. WorkflowOrchestrator.orchestrate():
+   - collectedData["recovery_email"] = "user@example.com"
+   - turnCount = 2
+   - nextAction = 'continue'
+9. conversationStore.set() + workflowStateStore.set()
+10. Response: { conversationId, messages, workflowState, nextAction }
+```
 
-  async listByUser(userId: string): Promise<StoredConversation[]> {
-    // ZRANGE with BYSCORE for range queries (e.g., last 7 days)
-    const members = await this.client.zrange(
-      `user:${userId}:conversations`,
-      0, -1,
-    );
-    const conversations = await Promise.all(
-      members.map((id) => this.get(id as string)),
-    );
-    return conversations.filter((c) => c !== undefined);
-  }
+**Impact on Existing Code:**
 
-  async delete(id: string): Promise<void> {
-    const conv = await this.get(id);
-    if (conv?.userId) {
-      await this.client.zrem(`user:${conv.userId}:conversations`, id);
-    }
-    await this.client.del(`conversation:${id}`);
-  }
+- **Backward compat**: If client doesn't send `workflowContext`, routes work exactly as v1.4 (no context prefix, no state updates).
+- **Store calls unchanged**: `conversationStore.get/set` still used identically.
+- **Normalizer unchanged**: `normalizeActivities` still called identically, still extracts payload.
+- **CopilotStudioClient unchanged**: Still singleton, still used same way.
+- **Error handling unchanged**: Redis/Copilot error differentiation still via `isRedisError`.
+
+---
+
+## Build Order & Dependencies
+
+### Phase Dependencies (What Must Be Built First)
+
+```
+shared/src/schemas/workflow.ts (CopilotStructuredOutputSchema, ParsedStructuredOutput, NextAction)
+  ↓ (depends on schema definitions)
+server/src/parser/structuredOutputParser.ts (uses ParsedStructuredOutput)
+  ↓ (depends on parser)
+server/src/workflow/contextBuilder.ts (independent, no dependencies on parser/orchestrator)
+  ↓
+server/src/workflow/WorkflowOrchestrator.ts (depends on parser, contextBuilder, WorkflowStateStore)
+  ↓ (depends on orchestrator)
+server/src/routes/chat.ts (refactor: extract buildContextPrefix → contextBuilder, call orchestrator)
+server/src/routes/orchestrate.ts (extend: call new orchestrator + parser)
+```
+
+### Recommended Build Order
+
+**Phase A: Schema Definitions (Foundational)**
+
+1. **`shared/src/schemas/workflow.ts`** (NEW)
+   - Define `CopilotStructuredOutputSchema` (Zod)
+   - Define `ParsedStructuredOutput` (Zod)
+   - Define `NextAction` enum
+   - Extend `OrchestrateResponseSchema` to include `workflowState, nextAction`
+   - Export types for use in server modules
+
+**Phase B: Parser (Parsing Strategy)**
+
+2. **`server/src/parser/structuredOutputParser.ts`** (NEW)
+   - `StructuredOutputParser` class
+   - `parse()` method with 3 strategies (exact, partial, fallback)
+   - Zod schema validation
+   - Confidence scoring
+   - Unit tests (9-12 test cases: exact match, partial, fallback, invalid, empty, etc.)
+
+**Phase C: Orchestration Infrastructure**
+
+3. **`server/src/workflow/contextBuilder.ts`** (NEW)
+   - Extract `buildContextPrefix` from `chat.ts` → standalone function
+   - Add `buildWorkflowContextPrefix(state, collectedData, step, constraints): string`
+   - Testable in isolation
+
+4. **`server/src/workflow/WorkflowOrchestrator.ts`** (NEW)
+   - `WorkflowOrchestrator` class
+   - Constructor: DI for `conversationStore, workflowStateStore, parser`
+   - `orchestrate(conversationId, messages, extractedPayload, existingState, schema?)` → updated state + nextAction
+   - `updateState()` mutation helper
+   - `determineNextAction()` decision tree
+   - Unit tests (10-15 cases: state accumulation, decision trees, schema validation, errors)
+
+**Phase D: Route Integration**
+
+5. **`server/src/routes/orchestrate.ts`** (EXTEND)
+   - Add call to `WorkflowOrchestrator.orchestrate()` after normalizeActivities
+   - Pass `ParsedStructuredOutput` to orchestrator
+   - Return `workflowState + nextAction` in response
+   - Backward compatible: if orchestrator disabled, omit from response
+
+6. **`server/src/routes/chat.ts`** (REFACTOR, MINIMAL)
+   - Remove inline `buildContextPrefix`, import from `contextBuilder`
+   - Add optional call to `WorkflowOrchestrator.orchestrate()` for /send and /card-action
+   - Add `workflowState` to response (optional field)
+   - No logic changes, only minor integration points
+
+7. **`shared/src/schemas/api.ts`** (EXTEND)
+   - Extend `SendMessageResponse`, `CardActionResponse` to include optional `workflowState`
+   - No breaking changes (new fields optional)
+
+**Phase E: Verification & Testing**
+
+8. **Integration tests**
+   - End-to-end orchestrate → parser → orchestrator flow
+   - Backward compat: requests without workflowContext still work
+   - Store integration: verify state persisted correctly
+
+---
+
+## Integration Points: New ↔ Existing
+
+### Parser ↔ Activity Normalizer
+
+**Current:** `normalizeActivities()` calls `extractStructuredPayload()` inline, returns `NormalizedMessage[]` with optional `extractedPayload`.
+
+**New:** Parser receives `NormalizedMessage[]` output from normalizer; re-examines `extractedPayload` surfaces plus raw text for multi-strategy validation.
+
+**Flow:**
+```
+normalizeActivities(activities: Activity[]) → NormalizedMessage[] (with extractedPayload)
+  ↓ (passed to parser)
+StructuredOutputParser.parse(messages: NormalizedMessage[], schema?) → ParsedStructuredOutput
+```
+
+**Implication:** Parser can re-validate or reparse failed extractions; normalizer logic untouched.
+
+### Orchestrator ↔ Conversation Store
+
+**Current:** Routes call `conversationStore.get/set` directly; store holds full conversation history in `StoredConversation`.
+
+**New:** Orchestrator updates `WorkflowState` via `workflowStateStore.set(conversationId, state)` AND updates `StoredConversation.stepData, metadata` via `conversationStore.set()`.
+
+**Flow:**
+```
+Route loads: conversationStore.get(conversationId) → StoredConversation
+  ↓ (history used for context)
+Orchestrator updates:
+  - workflowStateStore.set(conversationId, WorkflowState)
+  - conversationStore.set(conversationId, { ...old, stepData, metadata })
+```
+
+**Implication:** Dual-write pattern; WorkflowStateStore is source-of-truth for orchestration state, StoredConversation.stepData is audit trail. No migration needed; old records work via Zod `.default()`.
+
+### Orchestrator ↔ Context Builder
+
+**Current:** `buildContextPrefix()` called inline in route, returns string prefix.
+
+**New:** `contextBuilder.enrichContextForMessage()` called by orchestrator, same interface.
+
+**Flow:**
+```
+Route has workflowContext
+  ↓
+contextBuilder.enrichContextForMessage(text, state, collectedData)
+  ↓
+Prepend [WORKFLOW_CONTEXT] to message
+```
+
+**Implication:** testable in isolation; same behavior, better organization.
+
+### Routes ↔ Parser & Orchestrator
+
+**Current Routes:**
+1. Parse request
+2. Look up conversation
+3. Build message (with context prefix if provided)
+4. Send to Copilot
+5. Normalize response
+6. Store history
+7. Return
+
+**New Routes (additions only):**
+1. Steps 1-5 (unchanged)
+2. [NEW] Call `parser.parse(messages)`
+3. [NEW] Call `orchestrator.orchestrate(conversationId, messages, parsed, state)`
+4. Steps 6-7 (store now includes workflowState)
+5. Return response + workflowState
+
+**Implication:** Routes delegate parsing/orchestration to services; routes remain thin.
+
+---
+
+## Backward Compatibility Guarantees
+
+### Scenario 1: Client Doesn't Send `workflowContext`
+
+**v1.4 behavior (preserved):**
+```
+POST /api/chat/send
+{
+  "conversationId": "...",
+  "text": "Hello"
+}
+
+Response:
+{
+  "conversationId": "...",
+  "messages": [...]
 }
 ```
 
-**Why this design:**
-- Sorted sets enable O(log N) user-scoped lookups (Phase 1.5 feature)
-- JSON string storage avoids Redis JSON module dependency (keep stack simple)
-- TTL on primary key only (Redis TTL deletes key, sorted set entry becomes orphaned)
-- Async/await throughout (matches Express async route patterns)
+**v1.5 behavior (identical):**
+- ContextBuilder not called (no context to inject)
+- WorkflowOrchestrator not called (no state to manage)
+- Response adds optional `workflowState` field (not sent if null/absent)
+- Message history stored identically
 
----
+### Scenario 2: Copilot Returns Plain Text (No Structured Output)
 
-### 2. **Store Factory** (`server/src/store/createStore.ts`)
+**v1.4:**
+```
+NormalizedMessage: { kind: 'text', text: 'Hello!' }
+No extractedPayload
+```
 
-**Responsibility:** Single-point decision for which store implementation to use, based on environment variables.
+**v1.5:**
+```
+NormalizedMessage: { kind: 'text', text: 'Hello!' }
+Parser.parse() → ParsedStructuredOutput { validated: null, confidence: 'none', fallback: true }
+Orchestrator sees fallback → treats as unstructured passthrough
+Response includes workflowState (unmodified from previous turn)
+```
 
-**Logic:**
+### Scenario 3: Old Records in Redis
 
-```typescript
-// server/src/store/createStore.ts
-import { config } from '../config.js';
-import { Redis } from 'ioredis';
-import { InMemoryConversationStore } from './InMemoryStore.js';
-import { RedisStore } from './RedisStore.js';
-
-export function createStore(): ConversationStore {
-  if (config.REDIS_URL) {
-    const redisClient = new Redis(config.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      enableReadyCheck: false,
-      // For Azure Cache for Redis (Premium tier with TLS required)
-      tls: true, // Auto-enabled if REDIS_URL starts with rediss://
-    });
-
-    redisClient.on('error', (err) => {
-      console.error('[store] Redis client error:', err);
-    });
-
-    return new RedisStore(redisClient);
-  }
-
-  console.log('[store] REDIS_URL not set, using InMemoryStore');
-  return new InMemoryConversationStore();
+**v1.4 record:**
+```json
+{
+  "externalId": "...",
+  "sdkConversationRef": [...],
+  "history": [...],
+  "userId": "...",
+  "tenantId": "...",
+  "createdAt": "...",
+  "updatedAt": "...",
+  "status": "active"
 }
 ```
 
-**Deployment patterns:**
-
-```
-Development:     REDIS_URL not set → InMemoryStore (no dependencies)
-Local Redis:     REDIS_URL=redis://localhost:6379 → RedisStore
-Azure Redis:     REDIS_URL=rediss://myapp.redis.cache.windows.net:6380 → RedisStore (auto TLS)
-```
-
-**Integration into store/index.ts:**
-
+**v1.5 deserialization (Zod parse):**
 ```typescript
-import { createStore } from './createStore.js';
-
-export const conversationStore: ConversationStore = createStore();
+StoredConversationSchema.parse(record)
+// Missing fields use .default() values:
+// - workflowId: undefined (optional)
+// - currentStep: undefined (optional)
+// - stepData: undefined (optional)
+// - metadata: undefined (optional)
+// Result: { ...record, workflowId: undefined, currentStep: undefined, ... }
 ```
+
+**Implication:** Zero migration script needed; Zod handles it.
 
 ---
 
-### 3. **Expanded StoredConversation Schema** (shared/src/schemas/)
+## Suggested Implementation Checklist
 
-**Add to schema definition:**
+### Phase A: Schema (No Breaking Changes)
 
-```typescript
-// Add to ConversationStore.ts interface
-export interface StoredConversation {
-  // Existing fields
-  externalId: string;
-  sdkConversationRef: unknown;
-  history: NormalizedMessage[];
+- [ ] Create `shared/src/schemas/workflow.ts` with:
+  - `CopilotStructuredOutputSchema` (user-provided Zod schema)
+  - `ParsedStructuredOutput` (result of parser)
+  - `NextAction` enum
+- [ ] Extend `shared/src/schemas/api.ts`:
+  - Add `workflowState?: WorkflowState` to `SendMessageResponse`
+  - Add `workflowState?: WorkflowState` to `CardActionResponse`
+  - Add `nextAction?: NextAction` to `OrchestrateResponse`
+- [ ] Run `npm run lint`, `npm test` — all existing tests pass
 
-  // New fields (v1.4+)
-  userId: string;           // From req.user.oid (Entra OID, stable user identifier)
-  tenantId: string;         // From req.user.tid (org tenant ID)
-  createdAt: number;        // Timestamp (ms) — used as sorted set score
-  updatedAt: number;        // Timestamp (ms) — updated on each message
-  status: 'active' | 'archived' | 'deleted'; // Conversation lifecycle
+### Phase B: Parser (Isolated, Testable)
 
-  // Workflow fields (v1.5 prep)
-  workflowState?: WorkflowState;
-  extractedPayload?: ExtractedPayload;
-}
-```
+- [ ] Create `server/src/parser/structuredOutputParser.ts`:
+  - Class `StructuredOutputParser`
+  - `parse(messages, schema?)` method
+  - 3 strategies: exact, partial, fallback
+  - Confidence scoring
+- [ ] Unit tests (9-12 cases):
+  - Exact match against schema
+  - Partial field extraction
+  - Fallback on invalid JSON
+  - Empty response
+  - No extractedPayload
+- [ ] Run `npm run lint`, `npm test` — parser tests pass
 
-**Why these fields:**
+### Phase C: Orchestration (Thin Integration)
 
-- `userId, tenantId` — enable row-level security queries (future auth enhancement)
-- `createdAt, updatedAt` — enable chronological sorted set indexes and TTL policies
-- `status` — soft-delete support, archiving without data loss
-- Workflow fields — prepared for v1.5 orchestrator (already defined in existing schemas)
+- [ ] Create `server/src/workflow/contextBuilder.ts`:
+  - Move `buildContextPrefix` logic from `chat.ts`
+  - Add `buildWorkflowContextPrefix()` variant
+  - Unit tests (4-6 cases)
+- [ ] Create `server/src/workflow/WorkflowOrchestrator.ts`:
+  - Class with DI for stores + parser
+  - `orchestrate()` method
+  - `updateState()` helper
+  - `determineNextAction()` decision tree
+  - Unit tests (10-15 cases)
+- [ ] Run `npm run lint`, `npm test` — orchestrator tests pass
 
----
+### Phase D: Route Integration (Minimal Changes)
 
-### 4. **Secondary Index Pattern via Sorted Sets**
+- [ ] Modify `server/src/routes/chat.ts`:
+  - Import `contextBuilder` (replace inline buildContextPrefix)
+  - Optional call to `orchestrator.orchestrate()` after normalizeActivities
+  - Add `workflowState` to response shape
+  - No breaking logic changes
+- [ ] Modify `server/src/routes/orchestrate.ts`:
+  - Call orchestrator after parser
+  - Return `workflowState` and `nextAction` in response
+- [ ] Modify `server/src/routes/index.ts` (or app.ts):
+  - Register orchestrator singleton at module load (no changes to routing)
+- [ ] Run `npm run lint`, `npm test` — all existing tests still pass
 
-**Use case:** Phase 1.5 feature "List user's conversations"
+### Phase E: Verification
 
-**Example route (future):**
-
-```typescript
-// GET /api/chat/conversations?limit=20&days=7
-chatRouter.get('/conversations', async (req, res) => {
-  const { limit = 20, days = 7 } = req.query;
-  const user = req.user; // From auth middleware
-
-  // Timestamp range: last 7 days
-  const now = Date.now();
-  const sevenDaysAgo = now - (days as number) * 24 * 60 * 60 * 1000;
-
-  // Using store interface (works with both InMemory and Redis)
-  const conversations = await (conversationStore as RedisStore)
-    .listByUserRange(user.oid, sevenDaysAgo, now);
-
-  res.json({
-    count: conversations.length,
-    conversations: conversations.slice(0, limit as number),
-  });
-});
-```
-
-**Sorted set implementation in RedisStore:**
-
-```typescript
-async listByUserRange(
-  userId: string,
-  minScore: number,
-  maxScore: number,
-): Promise<StoredConversation[]> {
-  // ZRANGE key min max BYSCORE LIMIT offset count
-  const members = await this.client.zrange(
-    `user:${userId}:conversations`,
-    minScore,
-    maxScore,
-    'BYSCORE',
-    'LIMIT',
-    0,
-    100,
-  );
-
-  return Promise.all(
-    members.map((id) => this.get(id as string)),
-  ).then((convs) => convs.filter((c) => c !== undefined));
-}
-```
-
-**Why sorted sets:**
-
-- O(log N + M) where M is result count (vs. O(N) scan)
-- Enables range queries (createdAt range, status filtering via key naming)
-- No explicit index maintenance needed (ZADD on every write)
-- Scales to millions of conversations per user
+- [ ] Integration test: `/api/chat/orchestrate` full flow
+- [ ] Integration test: `/api/chat/send` with workflowContext
+- [ ] Backward compat test: `/api/chat/send` without workflowContext (identical to v1.4)
+- [ ] E2E: Multi-turn workflow via UI
+- [ ] Run full test suite: `npm test` passes 100%
 
 ---
 
-## Integration Points
+## Confidence Assessment
 
-### 1. **Chat Routes (chat.ts) — MINIMAL CHANGES**
-
-**Current behavior (works with Redis too):**
-
-```typescript
-// /start endpoint
-const conversation = {
-  externalId,
-  sdkConversationRef: collectedActivities,
-  history: [],
-};
-await conversationStore.set(externalId, conversation);
-
-// /send endpoint
-const conversation = await conversationStore.get(conversationId);
-// ... Copilot call ...
-await conversationStore.set(conversationId, {
-  ...conversation,
-  history: [...conversation.history, ...messages],
-});
-```
-
-**Required changes:** Populate new fields from JWT claims
-
-```typescript
-// In /start handler, after Copilot call
-const conversation: StoredConversation = {
-  externalId,
-  sdkConversationRef: collectedActivities,
-  history: [],
-  userId: req.user.oid,        // From auth middleware
-  tenantId: req.user.tid,      // From auth middleware
-  createdAt: Date.now(),
-  updatedAt: Date.now(),
-  status: 'active',
-};
-await conversationStore.set(externalId, conversation);
-
-// In /send handler
-await conversationStore.set(conversationId, {
-  ...conversation,
-  history: [...conversation.history, ...messages],
-  updatedAt: Date.now(),  // Update timestamp
-});
-```
-
-**Impact:** Routes stay simple, auth middleware provides user context, store handles persistence complexity.
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Integration Points | HIGH | All existing components (normalizer, stores, routes) remain untouched; new components integrate via clear interfaces (parser output → orchestrator input). |
+| Data Flow | HIGH | End-to-end trace (request → normalizer → parser → orchestrator → store) is linear and testable at each boundary. |
+| Build Order | HIGH | Dependencies are explicit and acyclic; schemas first, then parser, then orchestrator, then routes. |
+| Backward Compatibility | HIGH | Zod schema defaults, optional response fields, and passthrough logic ensure v1.4 behavior preserved exactly. |
+| Route Changes | MEDIUM | Changes are additions (new fields, optional service calls), not replacements; risk is low but requires careful integration testing. |
+| Parser Strategy Correctness | MEDIUM | Multi-strategy parsing (exact, partial, fallback) is sound, but confidence scoring rules are heuristic and may need tuning based on real Copilot output patterns. |
+| Orchestrator State Machine | MEDIUM | Decision tree (continue/collect_more/error/complete) is deterministic, but rule-based next-action determination may require domain-specific refinement per workflow. |
 
 ---
 
-### 2. **Health Check Endpoint (app.ts) — ENHANCED**
+## Gaps & Follow-Up Research
 
-**Current behavior:**
+### For Phase Implementation
 
-```typescript
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', authRequired: config.AUTH_REQUIRED });
-});
-```
+1. **CopilotStructuredOutputSchema Design**
+   - What does the expected Copilot response schema look like? (Form: `{ "field1": string, "field2": number }` or domain-specific?)
+   - Should schema be per-conversation or per-step?
+   - How to handle schema evolution (backward compat for schema changes)?
 
-**Required enhancement:**
+2. **Parser Confidence Thresholds**
+   - When is 'medium' confidence acceptable vs. requiring manual review?
+   - When to reject and fallback vs. accept partial extraction?
+   - Any domain-specific rules for Copilot's typical output patterns?
 
-```typescript
-app.get('/health', async (_req, res) => {
-  try {
-    // If Redis is configured, check its connectivity
-    if (conversationStore instanceof RedisStore) {
-      await conversationStore.ping(); // New method
-      res.json({
-        status: 'ok',
-        redis: 'connected',
-        authRequired: config.AUTH_REQUIRED,
-      });
-    } else {
-      res.json({
-        status: 'ok',
-        store: 'memory',
-        authRequired: config.AUTH_REQUIRED,
-      });
-    }
-  } catch (err) {
-    console.error('[health] Redis check failed:', err);
-    res.status(503).json({
-      status: 'unavailable',
-      redis: 'disconnected',
-      error: (err as Error).message,
-    });
-  }
-});
-```
+3. **Orchestrator Rule Engine**
+   - How to express `determineNextAction` rules declaratively? (Rule object, DSL, hardcoded?).
+   - What conditions trigger 'error' state vs. 'complete'?
+   - Should orchestrator support branching workflows (not just linear steps)?
 
-**Graceful failure:** Returns 503 when Redis unavailable (no silent fallback to InMemory). Deployment orchestrators detect 503 and trigger alerts/remediation.
+4. **State Persistence Edge Cases**
+   - How to handle state if Redis goes down mid-workflow? (Fallback to in-memory?)
+   - Should old states be cleaned up (TTL on workflowStateStore)?
+   - How to handle concurrent requests for same conversationId?
+
+5. **Client Integration**
+   - How does client know to show "more data needed" vs. "step complete" vs. "error"?
+   - Should `nextAction` be part of response or determined client-side from messages?
+   - How to handle user going "backwards" in a workflow?
+
+### For Future Milestones
+
+- **SSE Streaming:** Return parsed chunks as they arrive (not wait for full response).
+- **Workflow Templates:** Pre-defined workflows with schema definitions + rule engines.
+- **Audit Trail:** Log all state mutations for compliance/debugging.
+- **Retry & Recovery:** If parsing fails, should we retry with Copilot or offer manual fallback?
 
 ---
 
-### 3. **Configuration (config.ts) — NEW VARS**
+## Summary
 
-**Add to config.ts:**
+The Workflow Orchestrator and Structured Output Parser slot cleanly into the existing architecture:
 
-```typescript
-export const config = {
-  // ... existing vars ...
+1. **New parser** extracts and validates structured JSON from normalizer output.
+2. **New orchestrator** uses parser output to manage workflow state and determine next actions.
+3. **Context builder** enriches queries with workflow state (extracted from current implementation).
+4. **Routes change minimally**: add state loading, call parser+orchestrator, return state in response.
+5. **Stores are called unchanged**: orchestrator updates state separately, backward-compatible schema additions.
+6. **Backward compatibility is automatic**: clients not using workflows get v1.4 behavior exactly.
 
-  // Redis configuration (v1.4)
-  REDIS_URL: process.env.REDIS_URL, // e.g., "rediss://myapp.redis.cache.windows.net:6380"
-  REDIS_TIMEOUT_MS: Number(process.env.REDIS_TIMEOUT_MS ?? 5000),
-  REDIS_TTL_DAYS: Number(process.env.REDIS_TTL_DAYS ?? 30),
-} as const;
-```
-
-**Environment examples:**
-
-```bash
-# Local development (no Redis needed)
-# Leave REDIS_URL unset
-
-# Azure Cache for Redis (Premium tier with TLS)
-REDIS_URL=rediss://myapp.redis.cache.windows.net:6380
-REDIS_PASSWORD=<access-key>
-REDIS_TIMEOUT_MS=5000
-REDIS_TTL_DAYS=30
-
-# Or with connection string from Azure portal
-REDIS_URL=rediss://:defaultkey@myapp.redis.cache.windows.net:6380
-```
+**Build order:** Schemas → Parser → Orchestrator → Routes. Each phase is testable in isolation; integration tests verify the full flow.
 
 ---
 
-### 4. **Middleware Chain — NO CHANGES NEEDED**
-
-The auth middleware and orgAllowlist middleware run before routes, populate `req.user` with UserClaims. Routes then use `req.user.oid` and `req.user.tid` to populate store fields.
-
-**Data flow:**
-
-```
-Request → CORS → JSON → [/health: skip auth] or [/api: auth → orgAllowlist] → Route
-                                                                                  ↓
-                                                             Route accesses req.user
-                                                                    ↓
-                                                      Populates StoredConversation
-                                                                    ↓
-                                                             Store.set() (any backend)
-```
-
----
-
-## New vs Modified Components
-
-| Component | Status | Scope |
-|-----------|--------|-------|
-| `server/src/store/RedisStore.ts` | NEW | Redis implementation of ConversationStore interface |
-| `server/src/store/createStore.ts` | NEW | Factory function for store selection |
-| `shared/src/schemas/storedConversation.ts` | MODIFIED | Add userId, tenantId, createdAt, updatedAt, status |
-| `server/src/routes/chat.ts` | MODIFIED | Populate new StoredConversation fields in /start, /send, /card-action |
-| `server/src/app.ts` | MODIFIED | Enhance /health with Redis ping check |
-| `server/src/config.ts` | MODIFIED | Add REDIS_URL, REDIS_TIMEOUT_MS, REDIS_TTL_DAYS |
-| `server/src/store/index.ts` | MODIFIED | Use createStore() factory instead of hardcoded InMemoryStore |
-| `server/.env.example` | MODIFIED | Add REDIS_URL (optional) |
-| Tests (new) | NEW | RedisStore unit tests, health check integration tests |
-
----
-
-## Build Order & Dependency Chain
-
-**Phase 1 (Foundation — 1-2 days)**
-1. Expand StoredConversation schema in shared/
-   - Add userId, tenantId, createdAt, updatedAt, status fields
-   - Rebuild shared/ (`npm run build`)
-2. Create ConversationStore interface additions (listByUser, delete, ping)
-3. Create RedisStore.ts implementation
-   - Imports: ioredis, ConversationStore interface
-   - Implements all interface methods
-
-**Phase 2 (Integration — 1-2 days)**
-4. Create createStore.ts factory
-   - Depends on: RedisStore, InMemoryStore
-   - Returns ConversationStore (works with both)
-5. Update store/index.ts to use createStore()
-   - No route changes yet
-6. Add config vars (REDIS_URL, REDIS_TIMEOUT_MS, REDIS_TTL_DAYS)
-7. Update .env.example with Redis vars
-
-**Phase 3 (Routes & Health — 1 day)**
-8. Modify chat.ts routes to populate new fields from req.user
-   - userId: req.user.oid
-   - tenantId: req.user.tid
-   - createdAt, updatedAt: Date.now()
-   - status: 'active'
-9. Enhance /health endpoint with Redis ping
-10. Update app.ts to handle 503 from health check
-
-**Phase 4 (Testing — 1 day)**
-11. Unit tests for RedisStore
-    - get/set/delete with JSON serialization
-    - Sorted set operations (listByUser, listByUserRange)
-    - TTL expiry edge cases
-12. Integration tests for store factory
-    - Verify InMemoryStore used when REDIS_URL unset
-    - Verify RedisStore used when REDIS_URL set
-13. Health check tests
-    - 200 when Redis connected
-    - 503 when Redis unavailable
-14. End-to-end test with live Redis (or mock via testcontainers)
-
-**Dependency graph:**
-
-```
-shared schema expansion
-        ↓
-   RedisStore ─┐
-        ↓      ├─→ createStore factory
-   InMemoryStore─┘
-        ↓
-   store/index.ts update
-        ↓
-   chat.ts route updates + config updates
-        ↓
-   app.ts health check update
-        ↓
-   Tests
-```
-
----
-
-## Failure Modes & Resilience
-
-### Scenario 1: Redis Unavailable on Startup
-
-**Current behavior:** `createStore()` returns InMemoryStore, app boots successfully.
-**Desired behavior (v1.4):** If REDIS_URL is set but unreachable, fail fast.
-
-**Solution:** Test connection in createStore() or health check:
-
-```typescript
-export async function createStore(): Promise<ConversationStore> {
-  if (config.REDIS_URL) {
-    const redisClient = new Redis(config.REDIS_URL, { /* ... */ });
-
-    // Fail fast if Redis unavailable
-    try {
-      await redisClient.ping();
-    } catch (err) {
-      console.error('[store] FATAL: Redis unavailable but REDIS_URL is set');
-      process.exit(1);
-    }
-
-    return new RedisStore(redisClient);
-  }
-  return new InMemoryConversationStore();
-}
-```
-
-**Rationale:** Prevents silent data loss (InMemory fallback would lose all conversations on restart).
-
----
-
-### Scenario 2: Redis Network Timeout During Request
-
-**Current behavior:** Route handler hangs, client sees timeout.
-**Desired behavior:** Fast-fail with 503 Service Unavailable.
-
-**Solution:** Set timeouts on ioredis client:
-
-```typescript
-const redisClient = new Redis(config.REDIS_URL, {
-  connectTimeout: 5000,       // 5 second connection timeout
-  commandTimeout: 5000,       // 5 second command timeout
-  retryStrategy: () => null,  // Don't retry, fail fast
-  maxRetriesPerRequest: 0,    // 0 retries
-});
-
-redisClient.on('error', (err) => {
-  console.error('[store] Redis command failed:', err);
-  // Application continues but /health check returns 503
-});
-```
-
-**Impact:** Routes receive immediate error from RedisStore.get/set, catch block sends 502. Observability tools see pattern and alert.
-
----
-
-### Scenario 3: Conversation Key Expires in Redis
-
-**Current behavior:** Store.get(id) returns undefined, route sends 404.
-**Desired behavior:** Same — expected behavior for TTL.
-
-**TTL strategy:**
-
-- Primary key (conversation:{externalId}): 30 days
-- Sorted set index: no explicit TTL, cleaned up when primary expires
-- Soft-delete via status field: archive without TTL override
-
-**For longer-lived sessions:** Implement "touch on read" to extend TTL:
-
-```typescript
-async get(id: string): Promise<StoredConversation | undefined> {
-  const json = await this.client.get(`conversation:${id}`);
-  if (json) {
-    // Extend TTL on each read (e.g., sliding window)
-    await this.client.expire(`conversation:${id}`, 30 * 24 * 60 * 60);
-  }
-  return json ? JSON.parse(json) : undefined;
-}
-```
-
----
-
-## Scalability Considerations
-
-### Single Instance
-
-- InMemoryStore: LRU evicts after 100 conversations
-- RedisStore: Limited by Redis memory, typically 1-10GB per instance
-
-### Multiple Instances Behind Load Balancer
-
-**InMemoryStore:** Each instance has separate LRU cache, conversations not shared.
-- User A starts conversation on Instance 1
-- Load balancer routes User A to Instance 2
-- Instance 2 has no conversation (404)
-- Broken experience
-
-**RedisStore:** All instances read/write same Redis:
-- User A starts conversation on Instance 1 → written to Redis
-- Load balancer routes User A to Instance 2
-- Instance 2 reads from Redis (same store) → found
-- Seamless experience, rolling deploys work
-
-### At 10K+ Active Conversations
-
-- **InMemoryStore:** Single instance max ~100 (LRU limit)
-- **RedisStore:** ~10K on single 1GB Redis, ~100K on 10GB, ~1M+ on cluster
-
-**Sorted set queries (listByUser):**
-- 10 instances, 1000 convs/user: ZRANGE in O(log 10000 + 1000) milliseconds
-- 100 instances, 10K convs/user: Same O(log 100000 + 10000) 10-20ms
-- Redis Cluster: Sharding spreads load across nodes
-
----
-
-## Architecture Decision Record
-
-| Decision | Rationale | Implication |
-|----------|-----------|------------|
-| Use ConversationStore interface (no change for Redis) | Minimizes route impact, leverages existing abstraction | Routes never import Redis types |
-| Factory pattern (createStore) | Single decision point, testable, extensible | Easy to add other stores later |
-| JSON.stringify/parse (not Redis JSON module) | Keeps stack simple, no module dependency | Slightly more CPU on serialization, negligible vs network latency |
-| Sorted sets for secondary index | Enables efficient range queries, O(log N) lookups | Need to maintain both primary key + sorted set |
-| TTL on primary key only | Consistent expiry logic, no orphaned indexes | Sorted set entries stale after primary expires (not a problem) |
-| Graceful failure (503, not fallback) | Honest about dependencies, prevents silent data loss | Deployments must address Redis availability |
-| Config vars (REDIS_URL, TTL_DAYS) | Deployment flexibility, different TTLs per environment | More env vars, but documented in .env.example |
-
----
-
-## Known Limitations & Future Work
-
-### v1.4 Scope Limitations
-
-- No Redis Cluster support yet — single Redis instance only
-- No conversation archival UI — status field added but no endpoints
-- No encryption at rest — Redis data unencrypted
-- No pub/sub for real-time updates — InMemory also lacks this
-
-### Potential v1.5+ Enhancements
-
-- Distributed locks (via Redis) — prevent concurrent writes to same conversation
-- Lua scripting — atomic multi-operation updates
-- Keyspace notifications — emit events when conversations expire
-- Persistence strategy — AOF (every second) for crash recovery, RDB dumps for backups
-
----
-
-## Sources
-
-### Core Research
-
-- [Express.js Tutorial (2026): Practical, Scalable Patterns](https://thelinuxcode.com/expressjs-tutorial-2026-practical-scalable-patterns-for-real-projects/)
-- [ioredis GitHub Repository](https://github.com/redis/ioredis)
-- [Redis Secondary Indexing Patterns](https://redis.io/docs/latest/develop/clients/patterns/indexes/)
-- [Redis Sorted Sets Documentation](https://redis.io/docs/latest/develop/data-types/sorted-sets/)
-- [Factory Method Pattern in TypeScript and Node.js](https://medium.com/@diegomottadev/factory-method-pattern-implementation-using-typescript-and-node-js-6ac075967f22)
-
-### Persistence & TTL
-
-- [Redis TTL Management](https://redis.io/docs/latest/commands/expire/)
-- [Redis Persistence Options (RDB vs AOF)](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence/)
-- [Managing Key Expiration in Redis with JavaScript](https://codesignal.com/learn/courses/mastering-redis-for-high-performance-applications-with-nodejs/lessons/managing-key-expiration-in-redis-with-javascript)
-
-### Health Checks & Monitoring
-
-- [ioredis Connection Pooling Guide](https://www.w3tutorials.net/blog/ioredis-connection-pool-nodejs-example/)
-- [redis-healthcheck npm Package](https://www.npmjs.com/package/redis-healthcheck)
-- [How to Configure Connection Pooling for Redis](https://oneuptime.com/blog/post/2026-01-25-redis-connection-pooling/view)
-
-### Multi-Instance Scaling
-
-- [Redis for Multi-Tenant Applications](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/cache-redis)
-- [Scaling Stateful Services with Redis](https://medium.com/@jayanthpawar18/redis-beyond-caching-deploying-stateful-services-to-scale-backend-systems-b6f07dc0e9a9)
-- [Horizontal Scaling with Redis Pub/Sub](https://medium.com/walkme-engineering/horizontal-scaling-of-a-stateful-server-with-redis-pub-sub-fc56c875b1aa)
-
-### JSON Serialization
-
-- [Caching JSON Data in Redis with Node.js](https://www.geeksforgeeks.org/node-js/how-to-cache-json-data-in-nodejs/)
-- [Redis JSON Data Type Documentation](https://redis.io/docs/latest/develop/data-types/json/)
-- [RedisOM for Node.js](https://redis.io/docs/latest/integrate/redisom-for-node-js/)
-
----
-
-**Last Updated:** 2026-02-21
-**Status:** Research Complete — Ready for Phase Planning
+## Sources & References
+
+- **PROJECT.md** — v1.4 current state, tech stack, existing decisions
+- **CLAUDE.md** — Monorepo architecture, data flow, key design decisions
+- **Existing Code:**
+  - `server/src/routes/chat.ts` — current route implementations
+  - `server/src/normalizer/activityNormalizer.ts` — extraction logic
+  - `shared/src/schemas/*` — Zod schema patterns
+  - `server/src/store/ConversationStore.ts` — persistence interface

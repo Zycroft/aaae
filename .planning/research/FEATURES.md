@@ -1,8 +1,10 @@
 # Feature Research
 
-**Domain:** Enterprise chat UI — Copilot Studio + Adaptive Cards (React/Node, custom canvas)
-**Researched:** 2026-02-19
-**Confidence:** MEDIUM-HIGH (official Microsoft docs + multi-source verification; some UI-pattern claims from WebSearch only)
+**Domain:** Workflow Orchestrator + Structured Output Parsing for AI Agent Chat Systems
+**Researched:** 2026-02-21
+**Confidence:** HIGH
+
+*Note: This document supersedes the v1.0–v1.4 UI features research (2026-02-19). This research focuses exclusively on v1.5 workflow orchestration and structured output parsing, building on completed extraction (v1.3b) and state store (v1.4) infrastructure.*
 
 ---
 
@@ -10,235 +12,364 @@
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist. Missing these = product feels broken or incomplete. Enterprise users abandon products that fail these.
+Features users assume exist. Missing these = product feels incomplete or untrustworthy for workflow automation.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Message bubble transcript | Every chat product in existence has distinguishable user vs. bot message display | LOW | User bubbles right-aligned or labeled; bot bubbles left-aligned. Required for basic usability. |
-| Optimistic user message display | Users expect to see their message appear instantly; waiting for server confirmation feels broken | LOW | Render user bubble immediately on send; reconcile on server response. React `useOptimistic` (React 19) or local state pattern. |
-| Typing / thinking indicator | Users need feedback the agent is working; without it they think the app crashed | LOW | Animated indicator (spinner or pulsing dots) while awaiting Copilot Studio response. |
-| Loading skeletons for bot responses | Skeleton screens reduce perceived wait vs. blank space | LOW-MED | Shimmer skeleton in bot bubble position while response streams or arrives. |
-| Error toasts / send failure feedback | Network errors and API failures must surface to the user | LOW | Non-blocking toast for transient errors. Inline error state on the failed bubble (retry affordance). |
-| Adaptive Card rendering in transcript | Core product requirement — cards are the primary interaction modality | MED | `adaptivecards-react` renders card JSON inline in the transcript. Bot Framework Web Chat does this out of the box; custom canvas must implement manually. |
-| Submitted card disabled after action | Copilot Studio docs explicitly warn that cards allow multiple submits by default; disabling after submit is the expected pattern | MED | Cards must be visually disabled + non-interactive after submit to prevent double submission. Requires custom attachment renderer (per BotFramework-WebChat #1427). |
-| Submitted card pending state | User needs to know the submission is processing | LOW | Spinner or "Submitting…" overlay on card actions after click, before server response. |
-| Hybrid turn rendering (text + card in same message) | Agent responses often combine a text preamble with a card; rendering them as a unified turn is expected | MED | Bot activity can contain both `text` and `attachments`. Normalizer must extract both; UI must render them sequentially within one turn. |
-| Send box with text input | Basic text input for free-form conversation | LOW | Textarea or input; submit on Enter (with Shift+Enter for newline) or Send button. |
-| Conversation start / new conversation | Users need to start a fresh session; expected from all chat products | LOW | Triggers `/api/chat/start`; clears transcript; Copilot issues a new conversationId. |
-| Responsive layout (360px – 1280px+) | Mobile-first is a given; PROJECT.md specifies this range | MED | Single-column mobile layout. Desktop can add split pane (transcript + metadata drawer). Adaptive Cards must not use fixed-pixel-wide multi-column layouts on mobile. |
-| Dark / light mode | Dark mode is table stakes as of 2025 for any consumer or enterprise app | LOW-MED | `prefers-color-scheme` media query drives default; manual toggle persists preference to localStorage. CSS custom properties for color tokens. |
-| Reduced-motion respect | Accessibility requirement; WCAG 2.2 Level AA (EAA in force June 2025) | LOW | `prefers-reduced-motion: reduce` disables typing indicator animation, skeleton shimmer, and card transition animations. |
-| Keyboard navigation throughout | WCAG 2.1/2.2 requirement; enterprise legal exposure | MED | Focus trap handled correctly in send box. All interactive elements (buttons, card actions) reachable via Tab. Card submit buttons keyboard-activatable. |
-| Screen reader support (ARIA live regions) | WCAG 2.1 SC 4.1.3 (Status Messages); enterprise accessibility mandates | MED | Transcript container as `aria-live="polite"` region. New bot messages announced. Card submit confirmation announced. Error toasts announced. |
-| Avatar / sender identity | Standard visual pattern to distinguish user vs. agent in transcript | LOW | Bot avatar image or initials; user avatar or initials. Copilot Studio default canvas uses `botAvatarImage` / `userAvatarImage` styleOptions. |
-| Timestamp display | Users orient in time; enterprise audit expectations | LOW | Relative time ("just now", "2 min ago") toggling to absolute on hover. |
-
----
+| **Structured output extraction from LLM/agent responses** | Workflow decisions require reliable JSON/data parsing from unstructured agent text; cannot make data-driven decisions without extractable signals | HIGH | Multi-surface extraction (activity.value > entities > text) already in v1.3b; v1.5 adds parse-time validation + retry. Use Zod refine() for schema enforcement. |
+| **Fallback to passthrough mode on extraction failure** | Agent conversations must remain usable when structured parsing fails; breaking text chat when JSON is unparseable makes product broken | MEDIUM | When extraction validation fails, render agent response as plain text (identical to v1.0 behavior). Add kind flag to NormalizedMessage to signal parsing failure. |
+| **Validation of extracted data against JSON schema** | Malformed JSON or missing required fields must be caught before workflow consumes data; silent failures cause downstream cascading errors and wasted work | HIGH | Extend v1.3b ExtractedPayload with Zod refine() to reject empty payloads and invalid field types. Confidence levels per field ('high'\|'medium'\|'low'). |
+| **Workflow state tracking across conversation turns** | Multi-step workflows require agent to remember step, collected data, constraints across multiple user messages; stateless design cannot execute workflows | HIGH | v1.4 ConversationStore exists; v1.5 wires WorkflowState accumulation in /orchestrate endpoint. Store step, collectedData, lastRecommendation, turnCount. |
+| **Context enrichment for outbound Copilot queries** | Agent performance degrades when unaware of workflow context; naked queries lose signal that helps agent stay on track and avoid hallucinations | MEDIUM | Extend v1.3b [WORKFLOW_CONTEXT] prefix injection to include state summary (step, constraints, priorActions). Already partially wired; v1.5 formalizes in ContextBuilder module. |
+| **Retry mechanism for failed extraction attempts** | LLM output is non-deterministic; structured output fails ~5–15% of time in production; retry with corrective prompt recovers most failures without user intervention | MEDIUM | On Zod validation failure, auto-retry with corrective prompt asking LLM to re-output valid JSON with error details. Max 2–3 attempts with exponential backoff (200ms, 500ms). |
+| **Distinction between structured and unstructured responses** | Client UI must render correctly based on parse success/failure; attempting to render unvalidated JSON as form causes crashes or nonsense cards | LOW | Add optional flag in ExtractedPayload or NormalizedMessage to signal parsing failure. Client uses to choose rendering path (form vs plain text). |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set this product apart from stock Copilot Studio canvas or generic chat UIs. These align with the project's core value proposition.
+Features that set the product apart. Not required, but valuable.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| Split-pane desktop layout (transcript + metadata drawer) | Surfaces context (card action history, conversation metadata) without leaving the chat; no comparable in default Copilot Studio canvas | MED | Side drawer on desktop (≥768px breakpoint). Collapses to bottom sheet or hidden panel on mobile. |
-| Timeline sidebar summarizing completed card actions | Audit trail of structured interactions visible at a glance; unique to this product vs. default canvas | MED | Lists submitted cards with timestamp, action type, summary of values. Depends on: Adaptive Card rendering + card action tracking. |
-| Activity log download (JSON) | Enterprise auditability and debugging capability; differentiates from stock canvas | LOW-MED | Serializes normalized message array to JSON. Single button download. Depends on: normalized message schema (Zod). |
-| Card action allowlist enforcement (client-side) | Defense-in-depth against malicious card payloads; not a feature of default Copilot Studio canvas | MED | Client validates action type + data against allowlist before sending to `/api/chat/card-action`. Server re-validates (both layers). `Action.OpenUrl` domain allowlist prevents phishing via bot-delivered URLs. |
-| Normalized message schema (Zod, shared) | Type-safe contract between client and server; prevents entire class of runtime bugs | MED | `shared/` package with Zod schemas; both client and server import. Differentiates from ad-hoc message handling in typical implementations. |
-| MSAL On-Behalf-Of token flow stubs | Architecturally correct placeholder for enterprise SSO; signals production-readiness | LOW-MED | TODO-commented stub in server auth middleware. Teaches the integration pattern. Not functionally active in v1. |
-| Adaptive Cards playbook documentation | Provides a card registration pattern so future cards can be added predictably | LOW | Markdown doc in repo. Describes schema validation, allowlist registration, test patterns. Not common in reference implementations. |
-| Reduced-motion + accessible animations | Exceeds what most Copilot Studio custom canvas implementations bother to implement | LOW | See table stakes; elevated to differentiator because it's uncommon in practice even when required. |
-
----
+| Feature | Value Proposition | Complexity | When to Build |
+|---------|-------------------|------------|---------------|
+| **Confidence scoring per extracted field** | Operator dashboard shows which fields are high/low confidence; enables downstream filtering (use high-confidence data, queue low-confidence for review) | MEDIUM | Phase 2 (v1.6) — add confidence scoring to ExtractedPayload schema; expose in /orchestrate response and structured logs. Required for trustworthy workflows. |
+| **Multi-source extraction surface transparency** | Document extraction strategy: activity.value (highest fidelity) > activity.entities (structured) > text-embedded JSON (fallback). Formalizes and exposes confidence per surface. | MEDIUM | Phase 1 (v1.5) — already implemented; v1.5 extends with per-surface confidence scores and decision logging. |
+| **LLM-driven next-step determination** | After parsing extraction, send meta-query to agent: "What should happen next?" (collect_email, execute_action, end_workflow). Routes dynamically instead of hard-coded transitions. | HIGH | Phase 2 (v1.6) — new flow step after parsing. Requires new agent prompt template and state machine branching. Enables more flexible workflows. |
+| **Context window optimization via artifact offloading** | Large context (long history + collected data) causes token bloat and "lost in the middle" hallucination; offload to Redis with lightweight reference to reduce prompt size | HIGH | Phase 3+ (v1.7+) — defer unless v1.5 latency/cost testing shows token usage exceeds budget. Use handle pattern (store full data in Redis, reference by ID in prompt). |
+| **Structured observability logs of all workflow decisions** | Every state transition, extraction attempt, confidence decision logged with timestamps and full context; enables audit trails and multi-turn debugging | MEDIUM | Phase 2 (v1.6) — wrap all orchestrator decisions in structured logger. Emit to stdout + optional Redis. Required for production observability. |
+| **Partial/incremental state updates** | Workflow collects phone → email → address across turns; client sends deltas; server merges atomically without re-asking for data | MEDIUM | Phase 2 (v1.6) — extend StoredConversation.workflow with atomic patch merge logic. Improves UX: agent doesn't re-ask for previously provided data. |
+| **Intent classification pre-routing** | Pre-classify user message as [request_info, submit_form, ask_followup, escalate] before full Copilot turn; route early exits and simple cases without full agent | MEDIUM | Phase 3 (v1.7+) — optimization if latency/cost becomes issue. Requires lightweight classifier (small prompt, low token cost). |
+| **Explicit workflow definition as config** | Workflow transitions defined in JSON/YAML or TypeScript state machine, not scattered across route handlers. Single source of truth for step order and guards. | MEDIUM | Phase 1 (v1.5) — hand-rolled reducer (~100 lines TypeScript) or migrate to finity library. Enables testing and documentation. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create complexity, security risk, or scope creep without proportionate value for v1.
+Features that seem good but create problems.
 
-| Anti-Feature | Why Requested | Why Problematic | Alternative |
-|--------------|---------------|-----------------|-------------|
-| Real-time streaming token-by-token response | Feels "alive" like ChatGPT; users ask for it | Requires SSE or WebSocket infrastructure; Copilot Studio SDK does not natively stream token-by-token (it returns complete activities); significant server + client complexity for v1 | Use loading skeleton + optimistic display to manage perceived wait; revisit streaming in v2 if SDK supports it |
-| Conversation history / multi-session persistence | "I want to pick up where I left off" | Requires a persistent store (DB), a session identity model, and surfacing history UI; Copilot Studio conversationId is single-session; cross-session requires bot state APIs | Scope explicitly out of v1; log download covers the audit use case |
-| File / image upload in send box | Users want to attach files to agent requests | Copilot Studio standard Web Chat supports it but custom canvas proxy must handle multipart; adds attack surface and complexity; not in project requirements | Keep send box to text + card-action only |
-| Suggested replies / quick reply chips | Chat products show them; reduces typing friction | Copilot Studio can emit `suggestedActions` but mapping them reliably through the custom proxy is non-trivial; adds UI complexity for uncertain benefit | Defer; implement only if Copilot Studio topics specifically produce suggestedActions |
-| Full markdown parser in bot bubbles | Rich formatting expected from AI chat products | Requires a markdown library (e.g. `react-markdown`); introduces XSS risk if not sanitized; Adaptive Cards already handle structured content better than markdown in cards | Use a well-known sanitized markdown renderer (e.g. `react-markdown` + `rehype-sanitize`) only if bot responses actually use markdown in practice; do not default-enable |
-| Voice input / speech-to-text | Modern AI interfaces support voice | Out of scope per PROJECT.md; adds browser permission complexity, audio processing, and accessibility edge cases that dwarf the benefit | Note as future milestone; stub the UI affordance if desired |
-| Full conversation thread branching / editing | Users want to edit a past message and regenerate | No native support in Copilot Studio SDK for mid-conversation mutation; rewriting history causes state divergence | Not applicable; this is a turn-based bot protocol |
-| Real-time multi-user shared conversation | "Collaborative" agent sessions | Requires WebSocket broadcast, conflict resolution, and identity scoping; far outside project constraints | Single-user session per conversationId is the correct model |
-
----
+| Anti-Feature | Why Requested | Why Problematic | What to Do Instead |
+|--------------|---------------|-----------------|-------------------|
+| **Forcing structured output via regex/grammar-based token constraints** | Seems safer: lock tokens to valid JSON characters. Feels like guaranteed valid output. | Adds latency (tighter decoding loop), reduces model quality (constrained generation undershoots), increases cost. v1.3b already uses agent schema. Changes break if schema changes. | Use native Copilot SDK structured output mode + post-validation fallback. If SDK unavailable, rely on prompt engineering + Zod validation. |
+| **Context accumulation without bounds ("append everything")** | Simple to implement: just append every turn to prompt. Avoids complex windowing logic. | Fails catastrophically: token explosion → cost/latency disaster → hallucination ("lost in the middle"). Naive approach collapses at ~50 turns. Context bloat worsens hallucination via recency bias. | Implement context window budgeting: keep N recent turns + compressed state summary. Use artifact offloading (Phase 3) if context exceeds budget. Monitor token counts. |
+| **Dual storage (in-memory + Redis with async sync)** | Seems resilient: in-memory for speed, Redis for durability, periodic sync. | Creates race conditions, inconsistency, silent data loss. v1.4 factory pattern already solves this cleanly by selecting ONE backend. | Factory selects ONE backend: Redis or InMemory. No dual writes. Phase 4+ can add read replicas, not dual-write. |
+| **Storing serialized LLM conversation objects as JSON** | Seems persistent: if we can JSON.stringify the SDK conversation, we can resume it later. | SDK ConversationRef is a live object with internal timers/channels; JSON round-trip kills it. Deserialization fails or hangs. v1.4 already stores only conversationId. | Store only serializable scalars: conversationId, timestamps, user IDs. Keep live SDK objects in-memory only, scoped to single request or conversation. |
+| **Generic "extraction failed" fallback (discard all partial data)** | Seems safe: if validation fails completely, return empty object. No risk of using bad data. | Wastes signal: highest-confidence fields are still useful even if schema validation fails. Conversely, client doesn't know what's usable. | Return highest-confidence fields even if full schema fails. Add field-level confidence. Let client decide if partial extraction is useful. |
+| **Synchronous orchestrator steps (serialize everything)** | Seems clearer: no race conditions, no parallel bugs. Each step waits for prior step to finish. | Response latency grows O(n). Fetching context artifacts + initiating Copilot turn done serially doubles latency. Slow = poor UX. | Parallelize orthogonal operations: fetch context artifacts + initiate Copilot turn concurrently using Promise.all. Sequential for dependent steps only. |
+| **Hardcoded step transitions ("if step == X && condition, go to Y")** | Seems explicit: transitions written in code, easy to follow in one place. | Unmaintainable: step names scattered across routes, transitions duplicated, hard to test, error-prone. No single source of truth for workflow. | Define workflow transitions as declarative JSON/YAML config or use TypeScript state machine library (finity, xstate, hand-rolled reducer). Single source of truth. |
+| **Storing raw full message history in workflow state** | Seems complete: preserve everything for context. All history available for every decision. | Bloats state: every turn copies N prior messages. Multi-tenant database explodes. Context window grows O(n²). Serialization/deserialization expensive. | Store only message IDs/offsets + compressed summary of prior turns. Hydrate full history on-demand from MessageStore if needed. |
 
 ## Feature Dependencies
 
 ```
-[Conversation Start / new conversationId]
-    └──required by──> [Message Send (text)]
-    └──required by──> [Card Action Submit]
-                          └──required by──> [Card Disabled/Pending State]
-                          └──required by──> [Timeline Sidebar]
-                          └──required by──> [Activity Log Download]
+Structured output extraction (v1.3b exists)
+    ├──requires──> Zod validation in shared/
+    ├──requires──> ExtractedPayload schema refinement
+    └──enables──> Fallback passthrough (renders as text on validation failure)
+                  Retry mechanism (on validation failure, re-prompt Copilot)
+                  Confidence scoring (metadata on confidence)
 
-[Adaptive Card Rendering]
-    └──required by──> [Card Action Submit]
-    └──required by──> [Card Disabled/Pending State]
-    └──required by──> [Card Action Allowlist Enforcement]
-    └──required by──> [Hybrid Turn Rendering (text + card)]
+Workflow state tracking (v1.4 ConversationStore exists)
+    ├──requires──> StoredConversation.workflow field (exists in v1.4)
+    ├──requires──> /orchestrate endpoint wiring (partial in v1.3b)
+    └──enables──> Context enrichment (state fed into prompt)
+                  LLM-driven next-step (state used in meta-query)
+                  Partial state updates (atomic merge)
 
-[Normalized Message Schema (Zod)]
-    └──required by──> [Activity Log Download]
-    └──required by──> [Timeline Sidebar]
-    └──required by──> [Hybrid Turn Rendering]
-    └──required by──> [Error Toast / Send Failure]
+Context enrichment (v1.3b [WORKFLOW_CONTEXT] prefix exists)
+    ├──requires──> Workflow state (to enrich with)
+    ├──requires──> ContextBuilder module (new)
+    └──enables──> Dynamic system prompt adaptation
 
-[Optimistic User Bubble]
-    └──enhances──> [Error Toast / Send Failure] (rollback pattern)
+Confidence scoring (independent of extraction)
+    ├──enhances──> Structured output extraction (metadata on confidence)
+    ├──enhances──> Observability logs (decision metadata)
+    └──enables──> Intent classification (confidence threshold for routing)
 
-[Keyboard Navigation]
-    └──enhances──> [Card Action Submit] (card buttons must be keyboard-reachable)
-    └──enhances──> [Send Box]
+LLM-driven next-step
+    ├──requires──> Extraction (parsed signals input to decision)
+    ├──requires──> State machine (transitions based on decision)
+    ├──requires──> ContextBuilder (context for meta-query)
+    └──conflicts──> Hardcoded transitions (choose one pattern)
 
-[ARIA Live Regions]
-    └──enhances──> [Error Toast]
-    └──enhances──> [Bot Response Display]
-    └──enhances──> [Card Submit Confirmation]
+State machine (hand-rolled reducer or finity)
+    ├──requires──> Extraction (signals to make routing decisions)
+    ├──enables──> Partial state updates (tracking collectedData)
+    └──enables──> Observability (every transition logged)
 
-[Dark / Light Mode (CSS tokens)]
-    └──enhances──> [Adaptive Card Rendering] (Adaptive Cards adapt to host theme via CSS variable injection)
+Observability logs
+    ├──enhances──> All features above (logging all decisions)
+    └──independent──> Can be added across phases; non-blocking
 
-[Reduced-Motion]
-    └──conflicts──> [Typing Indicator Animation] (must be suppressed)
-    └──conflicts──> [Skeleton Shimmer] (must be suppressed)
+Context window optimization
+    ├──optional──> Only needed if token budget exceeded in v1.5 testing
+    └──conflicts──> Dual storage (use only factory pattern)
 ```
 
 ### Dependency Notes
 
-- **Card Action Submit requires Adaptive Card Rendering:** The card must be rendered and interactive before a submit action can be dispatched.
-- **Timeline Sidebar requires Card Action tracking:** Card submissions must be stored in normalized state to surface in the sidebar; this is downstream of both Zod schema and card action handling.
-- **Activity Log Download requires Normalized Schema:** The download is a serialization of the normalized message array; schema correctness is a prerequisite.
-- **Card Disabled State requires custom renderer:** Bot Framework Web Chat does not disable cards after submit by default. A custom attachment middleware or renderer override is required (BotFramework-WebChat issue #1427).
-- **Dark Mode enhances Adaptive Card rendering:** Adaptive Cards inherit host theme variables; consistent CSS custom properties allow the host theme toggle to flow into card rendering without per-card overrides.
-
----
+- **Structured output extraction requires Zod validation:** v1.3b extraction exists; v1.5 adds parse-time validation with Zod refine() to reject malformed or empty payloads. Cannot enable fallback or retry without this.
+- **Fallback passthrough requires failed extraction detection:** On Zod validation failure, trigger passthrough mode; add kind flag to signal client rendering engine.
+- **Workflow state tracking requires /orchestrate endpoint:** v1.4 ConversationStore wired for persistence; v1.5 wires state accumulation in /orchestrate. State must survive across multiple /send calls.
+- **Context enrichment requires workflow state:** Cannot enrich context without state to embed. v1.3b context injection exists as structured prefix; v1.5 extends with full state summary (step, priorActions, constraints).
+- **Retry mechanism requires validation failure detection:** Only triggered on Zod parse failure; modifies prompt with error details and retries. Orthogonal to all other features.
+- **LLM-driven next-step requires extraction + state + context:** Meta-query sent to agent after extraction; decision fed into state machine to select next step. Requires both structured extraction and state tracking.
+- **Confidence scoring enhances extraction:** Metadata added to ExtractedPayload; not required for MVP, but enables downstream filtering and operator dashboards. Can be added in Phase 2.
+- **Observability logs are orthogonal:** Can be added across phases; cuts across all other features. Non-blocking; can be stubbed in Phase 1 and enriched in Phase 2.
+- **Context window optimization conflicts with context accumulation:** If implementing windowing, don't also do dual storage; use factory pattern. Defer to Phase 3 unless v1.5 testing shows token budget exceeded.
 
 ## MVP Definition
 
-### Launch With (v1)
+### Launch With (v1.5)
 
-Minimum viable product — what's needed for the core value proposition to work end to end.
+Minimum viable product for workflow orchestrator + structured output parsing. Building on v1.3b extraction and v1.4 state store.
 
-- [ ] Message bubble transcript with user/bot distinction — without this there is no chat
-- [ ] Optimistic user bubble + loading skeleton — eliminates perceived broken state during async calls
-- [ ] Typing indicator — basic async feedback
-- [ ] Error toast with inline bubble error state — required for any production use
-- [ ] Adaptive Card rendering (adaptivecards-react, version 1.5) — core modality for this product
-- [ ] Card disabled + pending state after submit — prevents double-submission bug Copilot Studio docs explicitly warn about
-- [ ] Hybrid turn rendering (text + card in one bot activity) — agents routinely return both
-- [ ] Conversation start / new conversation — without this there is no session
-- [ ] Responsive layout 360px–1280px — PROJECT.md hard requirement
-- [ ] Dark / light mode toggle + prefers-color-scheme default — table stakes in 2025/2026
-- [ ] Reduced-motion respect — accessibility and EAA compliance
-- [ ] Keyboard navigation + basic ARIA live regions — WCAG 2.2 Level AA (legally required in EU since June 2025)
-- [ ] Card action allowlist enforcement (client + server) — security requirement from PROJECT.md
-- [ ] Normalized Zod message schema (shared package) — all downstream features depend on this
-- [ ] Activity log download (JSON) — audit use case; low complexity, high enterprise value
+- [x] **Structured output validation** — Extend v1.3b extraction with Zod refine() to reject empty/invalid payloads; add field-level confidence ('high'|'medium'|'low').
+- [x] **Fallback to passthrough** — On validation failure, render agent response as plain text (no form); add kind flag to distinguish from successful extraction.
+- [x] **Retry mechanism** — On validation failure, auto-retry with corrective prompt asking LLM to provide valid JSON; max 2 attempts with 200ms backoff.
+- [x] **Basic state tracking** — Accept WorkflowState in /orchestrate request; accumulate into StoredConversation.workflow; return updated state in response.
+- [x] **Context enrichment** — Extend [WORKFLOW_CONTEXT] prefix to include state summary (step, collectedData, constraints). Formalize in new ContextBuilder module.
+- [x] **State machine skeleton** — Define step enum and basic transitions (not dynamic routing yet; v1.6 adds LLM-driven decisions). Use hand-rolled reducer or TypeScript types.
 
-### Add After Validation (v1.x)
+### Add After Validation (v1.6)
 
-Add once the core is working and producing real usage data.
+Features to add once core orchestrator is working and validated in testing.
 
-- [ ] Timeline sidebar (desktop) — valuable but requires card action tracking to be stable first; trigger: users request history review
-- [ ] MSAL OBO token flow (real, not stub) — trigger: moving to production deployment with real user identities
-- [ ] Suggested replies rendering — trigger: Copilot Studio topics actually emit suggestedActions
-- [ ] Markdown rendering in bot bubbles — trigger: real bot responses use markdown and users notice missing formatting
+- [ ] **Confidence scoring in logs** — Every parse decision logged with confidence threshold; enables observability and per-field filtering.
+- [ ] **LLM-driven next-step determination** — Meta-query after extraction: "What should happen next?" Routes dynamically instead of hardcoded transitions.
+- [ ] **Structured orchestrator decision logs** — Every state transition, extraction, fallback decision timestamped and queryable; enables audit trails and debugging.
+- [ ] **Partial state updates** — Client sends deltas; server merges atomically; avoids re-asking for previously provided data.
+- [ ] **State machine graph definition** — Explicit workflow definition as JSON or TypeScript (migrate to finity or xstate if complexity grows).
 
-### Future Consideration (v2+)
+### Future Consideration (v1.7+)
 
-Defer until product-market fit is established and requirements are clearer.
+Features to defer until core workflows are proven in production and requirements are clearer.
 
-- [ ] Conversation history / multi-session persistence — requires DB + session identity model; validate demand first
-- [ ] Voice input — significant scope increase; browser permissions + audio processing
-- [ ] Token-by-token streaming responses — only viable if Copilot Studio SDK adds native streaming support
-- [ ] Collaborative / shared sessions — architecture change; validate use case first
+- [ ] **Context window optimization via artifact offloading** — Large context causes token bloat and "lost in the middle" hallucination. Defer until token budget exceeded in real usage.
+- [ ] **Intent classification pre-routing** — Lightweight pre-classifier for simple cases; optimization only if latency/cost becomes issue.
+- [ ] **User-specific conditional logic** — Role-based or tier-based routing. Defer until multi-user/multi-role requirements emerge.
+- [ ] **Dynamic system prompt per step** — System prompt references workflow step; changes per turn. Low priority; static prompt works v1.5–v1.6.
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | User Value | Implementation Cost | Priority |
-|---------|------------|---------------------|----------|
-| Message bubble transcript | HIGH | LOW | P1 |
-| Adaptive Card rendering | HIGH | MEDIUM | P1 |
-| Card disabled/pending after submit | HIGH | MEDIUM | P1 |
-| Hybrid turn (text + card) | HIGH | MEDIUM | P1 |
-| Optimistic user bubble | HIGH | LOW | P1 |
-| Error toast + inline error | HIGH | LOW | P1 |
-| Responsive layout (360–1280px) | HIGH | MEDIUM | P1 |
-| Normalized Zod schema | HIGH | MEDIUM | P1 |
-| Card action allowlist (client + server) | HIGH | MEDIUM | P1 |
-| Keyboard navigation | HIGH | MEDIUM | P1 |
-| ARIA live regions | HIGH | MEDIUM | P1 |
-| Dark / light mode toggle | HIGH | LOW | P1 |
-| Reduced-motion respect | MEDIUM | LOW | P1 |
-| Loading skeleton | MEDIUM | LOW | P1 |
-| Typing indicator | MEDIUM | LOW | P1 |
-| Activity log download | HIGH | LOW | P1 |
-| Timeline sidebar (desktop) | MEDIUM | MEDIUM | P2 |
-| MSAL OBO stubs | MEDIUM | LOW | P1 (stub only) |
-| Suggested replies | LOW | MEDIUM | P3 |
-| Markdown in bot bubbles | MEDIUM | LOW | P2 |
-| Conversation history (multi-session) | MEDIUM | HIGH | P3 |
-| Voice input | LOW | HIGH | P3 |
-| Streaming responses | MEDIUM | HIGH | P3 |
+| Feature | User Value | Implementation Cost | Priority | Phase | Dependencies |
+|---------|------------|---------------------|----------|-------|--------------|
+| Structured output validation | HIGH | HIGH | P1 | v1.5 | v1.3b ExtractedPayload, Zod |
+| Fallback passthrough | HIGH | MEDIUM | P1 | v1.5 | Validation (detection of failure) |
+| Retry mechanism | HIGH | MEDIUM | P1 | v1.5 | Validation (failure detection) |
+| Workflow state tracking | HIGH | MEDIUM | P1 | v1.5 | v1.4 ConversationStore, /orchestrate |
+| Context enrichment (extension) | HIGH | MEDIUM | P1 | v1.5 | Workflow state |
+| State machine skeleton | HIGH | MEDIUM | P1 | v1.5 | Workflow state |
+| Confidence scoring | MEDIUM | MEDIUM | P2 | v1.6 | Structured extraction |
+| LLM-driven next-step | MEDIUM | HIGH | P2 | v1.6 | Extraction + state + context |
+| Structured observability logs | MEDIUM | MEDIUM | P2 | v1.6 | All orchestrator features |
+| Partial state updates | MEDIUM | MEDIUM | P2 | v1.6 | State tracking, atomic merge |
+| Explicit workflow config | MEDIUM | MEDIUM | P2 | v1.6 | State machine |
+| Context window optimization | MEDIUM | HIGH | P3 | v1.7+ | Only if testing shows need |
+| Intent classification | LOW | MEDIUM | P3 | v1.7+ | Latency/cost optimization |
+| Dynamic system prompt | LOW | LOW | P3 | v1.7+ | Context enrichment extension |
 
 **Priority key:**
-- P1: Must have for launch
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
+- P1: Must have for v1.5 launch (workflow orchestrator + structured parsing)
+- P2: Should have for v1.6 (observability + dynamic routing)
+- P3: Nice to have, future consideration (optimizations + advanced features)
 
 ---
 
-## Competitor Feature Analysis
+## Complexity Breakdown
 
-| Feature | Copilot Studio Default Canvas (Bot Framework Web Chat) | ChatGPT Enterprise | Our Approach |
-|---------|--------------------------------------------------------|--------------------|--------------|
-| Adaptive Cards rendering | Built-in; all action types supported | Not applicable (no AC) | Custom renderer with pending/disabled state overrides |
-| Card disabled after submit | NOT built-in; requires custom middleware | N/A | Custom attachment renderer (P1 requirement) |
-| Hybrid text + card turns | Supported natively in Web Chat | N/A | Normalizer extracts both from activity; renders sequentially |
-| Split-pane / sidebar | Not available in default canvas | Sidebar panels (canvas, artifacts) | Desktop split pane + metadata drawer (differentiator) |
-| Activity / audit log | Not available | Partial (admin conversation history) | JSON download of normalized activity log |
-| Dark mode | Configurable via styleOptions | Yes, native | CSS custom properties + toggle + prefers-color-scheme |
-| Responsive mobile | Fixed 450px widget by default | Yes, native app | Full viewport responsive from 360px |
-| Accessibility (ARIA) | Partial in Bot Framework Web Chat | Partial | Full WCAG 2.2 AA: live regions, keyboard nav |
-| Action allowlist (security) | Not built-in; must be custom | Server-side only | Both client validation + server enforcement |
-| Conversation restart | Built-in restart button in custom canvas sample | "New Chat" button | Explicit new conversation trigger with transcript clear |
+### High Complexity (2–5 days each)
+
+**Structured output validation + retry (3 days)**
+- Handle: valid JSON but invalid schema, partial JSON, hallucinations in nested fields
+- Retry strategy: return full error to LLM asking for corrected output (not just "invalid JSON")
+- Trade-off: retry adds 200–500ms per attempt; cap at 2–3 with exponential backoff
+- Testing: mock malformed Copilot responses, verify retry path and fallback activation
+
+**Workflow state machine (3–5 days)**
+- Define: step enum, transitions, guards (e.g., "only collect_email if phone exists")
+- Tool choice: hand-rolled reducer (~100 lines TypeScript) vs finity (library) vs xstate (overkill)
+- Recommendation: hand-rolled reducer for v1.5; migrate to finity if v1.6 adds complex branching
+- Testing: state transitions validate; collected data accumulates correctly; steps don't skip
+
+**LLM-driven next-step determination (3 days, v1.6)**
+- Send meta-query to agent after extraction; parse decision output
+- Transitions become dynamic based on LLM signal instead of hardcoded rules
+- Testing: mock agent returning different next-step decisions; verify routing
+
+### Medium Complexity (1–2 days each)
+
+**Confidence scoring (1 day)**
+- Copilot SDK may not expose token probabilities for structured fields
+- Approximate: presence + validation pass/fail → 3-level confidence ('high'|'medium'|'low')
+- Add to ExtractedPayload schema: confidence per field or per payload
+- Testing: mock different confidence scenarios; verify client receives and logs
+
+**Fallback passthrough (1 day)**
+- On Zod validation failure, set kind='unstructured', clear cardJson, keep text
+- Client detects and renders as plain text instead of form
+- Testing: mock extraction failure; verify chat renders text, not broken card
+
+**Context enrichment expansion (1 day)**
+- Current: [WORKFLOW_CONTEXT] with step, constraints, collectedData
+- Extend: add priorActions (list of prior decisions), lastExtraction summary
+- Additive change to existing prompt; low risk
+- Testing: verify context injected correctly; agent understands state
+
+**Observability logging (1 day)**
+- Wrap all orchestrator decisions: { timestamp, stepName, actionType, status, confidence, error? }
+- Emit to stdout (Heroku/Azure logging); optional Redis key for recent logs
+- Testing: run workflow; grep logs for complete decision chain
+
+**Partial state updates (1 day)**
+- Client sends delta (only changed fields); server merges atomically
+- Testing: send partial updates; verify merge doesn't lose data
+
+**State machine graph definition (1 day)**
+- Explicit workflow definition as JSON or TypeScript
+- Testing: parse config, generate state machine, verify transitions
+
+### Low Complexity (< 1 day)
+
+**State tracking in /orchestrate (< 1 day)**
+- Accept workflowState in request; store in StoredConversation.workflow; return updated state
+- v1.4 infrastructure exists; this is wiring
+- Testing: send state; verify persistence across /send calls
+
+**Kind flag for structured/unstructured (< 1 day)**
+- Add optional flag to NormalizedMessage or ExtractedPayload
+- Client uses to distinguish parsing success from failure
+- Testing: verify flag set correctly on validation success/failure
+
+---
+
+## Key Implementation Patterns
+
+### Extraction Retry Pattern
+
+```typescript
+// Pseudo-code
+async function extractWithRetry(copilotResponse: string, maxAttempts = 2) {
+  let result = parseJSON(copilotResponse);
+  let attempts = 1;
+
+  while (attempts < maxAttempts && !isValidSchema(result)) {
+    const error = getValidationError(result);
+    const correction = await copilot.send(
+      `Previous output was invalid: ${error}.\n` +
+      `Please provide valid JSON matching this schema: ${getSchema()}`
+    );
+    result = parseJSON(correction);
+    attempts++;
+  }
+
+  return {
+    data: result,
+    validated: isValidSchema(result),
+    attempts,
+    confidence: calculateConfidence(result, attempts)
+  };
+}
+```
+
+### Context Enrichment Pattern
+
+```typescript
+// Build enriched context from WorkflowState
+function buildContextPrefix(state: WorkflowState): string {
+  return `[WORKFLOW_CONTEXT]
+Step: ${state.step}
+Constraints: ${JSON.stringify(state.constraints)}
+Collected Data: ${JSON.stringify(state.collectedData)}
+Prior Actions: ${state.priorActions?.map(a => `Turn ${a.turn}: ${a.action}`).join('; ') || 'None'}
+[END_CONTEXT]`;
+}
+
+// Prepend to outbound message
+const enrichedMessage = buildContextPrefix(workflowState) + userMessage;
+await copilot.send(enrichedMessage);
+```
+
+### State Machine Pattern (Hand-Rolled Reducer)
+
+```typescript
+type WorkflowStep = 'collect_phone' | 'collect_email' | 'collect_address' | 'confirm' | 'done';
+
+interface WorkflowState {
+  step: WorkflowStep;
+  collectedData: Record<string, any>;
+  turnCount: number;
+}
+
+function getNextStep(
+  current: WorkflowState,
+  extracted: ExtractedPayload,
+): WorkflowState {
+  switch (current.step) {
+    case 'collect_phone':
+      return {
+        ...current,
+        step: extracted.data.phone ? 'collect_email' : 'collect_phone',
+        collectedData: { ...current.collectedData, phone: extracted.data.phone },
+      };
+    case 'collect_email':
+      return {
+        ...current,
+        step: extracted.data.email ? 'collect_address' : 'collect_email',
+        collectedData: { ...current.collectedData, email: extracted.data.email },
+      };
+    // ... more cases
+    default:
+      return { ...current, step: 'done' };
+  }
+}
+```
 
 ---
 
 ## Sources
 
-- Microsoft Copilot Studio — Adaptive Cards overview (official docs, updated 2025-12-22):
-  https://learn.microsoft.com/en-us/microsoft-copilot-studio/adaptive-cards-overview
-- Microsoft Copilot Studio — Customize the default canvas (official docs, updated 2025-12-19):
-  https://learn.microsoft.com/en-us/microsoft-copilot-studio/customize-default-canvas
-- Microsoft Teams — Designing Adaptive Cards for your app (official docs, updated 2025-04-04):
-  https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/design-effective-cards
-- BotFramework-WebChat GitHub issue #1427 — Disable Adaptive Cards after submit/obsoleted:
-  https://github.com/Microsoft/BotFramework-WebChat/issues/1427
-- WCAG 2.2 compliance (European Accessibility Act in force June 28, 2025):
-  https://www.w3.org/WAI/standards-guidelines/wcag/new-in-21/
-- Conversational AI UI comparison 2025 (IntuitionLabs — competitor feature analysis):
-  https://intuitionlabs.ai/articles/conversational-ai-ui-comparison-2025
-- Optimistic UI pattern with React useOptimistic:
-  https://www.freecodecamp.org/news/how-to-use-the-optimistic-ui-pattern-with-the-useoptimistic-hook-in-react/
-- ARIA live regions for chat interfaces:
-  https://www.allaccessible.org/blog/implementing-aria-labels-for-web-accessibility
-- Action.OpenUrl domain allowlist security (BotFramework-WebChat issue #3225):
-  https://github.com/microsoft/BotFramework-WebChat/issues/3225
-- Adaptive Cards design best practices hub:
-  https://adaptivecards.microsoft.com/?topic=design-best-practices
+### Workflow Orchestration Frameworks & Patterns
+- [Top 10+ Agentic Orchestration Frameworks & Tools in 2026](https://aimultiple.com/agentic-orchestration)
+- [The 2026 Guide to Agentic Workflow Architectures](https://www.stack-ai.com/blog/the-2026-guide-to-agentic-workflow-architectures)
+- [AI Agent Architecture: Build Systems That Work in 2026](https://redis.io/blog/ai-agent-architecture/)
+- [Architecting efficient context-aware multi-agent framework for production](https://developers.googleblog.com/architecting-efficient-context-aware-multi-agent-framework-for-production/)
+- [Agentic Frameworks in 2026: What Actually Works in Production](https://zircon.tech/blog/agentic-frameworks-in-2026-what-actually-works-in-production/)
+
+### Structured Output & Extraction
+- [Structured Outputs Guide - Perplexity](https://docs.perplexity.ai/guides/structured-outputs)
+- [How do Structured Outputs Work? | Cohere](https://docs.cohere.com/docs/structured-outputs)
+- [The guide to structured outputs and function calling with LLMs](https://agenta.ai/blog/the-guide-to-structured-outputs-and-function-calling-with-llms)
+- [Use entities and slot filling in agents - Microsoft Copilot Studio](https://learn.microsoft.com/en-us/microsoft-copilot-studio/advanced-entities-slot-filling)
+- [Improve AI accuracy: Confidence Scores in LLM Outputs Explained](https://medium.com/@vatvenger/confidence-unlocked-a-method-to-measure-certainty-in-llm-outputs-1d921a4ca43c)
+
+### Structured Output Validation & Error Recovery
+- [Error Recovery and Fallback Strategies in AI Agent Development](https://www.gocodeo.com/post/error-recovery-and-fallback-strategies-in-ai-agent-development)
+- [Complex data extraction with function calling](https://langchain-ai.github.io/langgraph/tutorials/extraction/retries/)
+- [LLM Output Parsing and Structured Generation Guide](https://tetrate.io/learn/ai/llm-output-parsing-structured-generation)
+- [Instructor - Multi-Language Library for Structured LLM Outputs](https://python.useinstructor.com/)
+
+### Multi-Turn State Management
+- [Multi-Turn Conversational Agents](https://www.lyzr.ai/glossaries/multi-turn-conversational-agents/)
+- [How To Build Multi-Turn AI Conversations With Rasa](https://rasa.com/blog/multi-turn-conversation)
+- [Multi-turn Conversations with Agents: Building Context Across Dialogues](https://medium.com/@sainitesh/multi-turn-conversations-with-agents-building-context-across-dialogues-f0d9f14b8f64)
+- [Conversation state | OpenAI API](https://platform.openai.com/docs/guides/conversation-state)
+
+### Context Management & Hallucination Prevention
+- [Context Engineering for AI Agents: Lessons from Building Manus](https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus/)
+- [Cutting Through the Noise: Smarter Context Management for LLM-Powered Agents](https://blog.jetbrains.com/research/2025/12/efficient-context-management/)
+- [When More Becomes Less: Why LLMs Hallucinate in Long Contexts](https://medium.com/design-bootcamp/when-more-becomes-less-why-llms-hallucinate-in-long-contexts-fc903be6f025)
+- [How Long Contexts Fail](https://www.dbreunig.com/2025/06/22/how-contexts-fail-and-how-to-fix-them.html)
+
+### Adaptive Cards & Workflow State
+- [Sequential Workflow for Adaptive Cards - Teams](https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/universal-actions-for-adaptive-cards/sequential-workflows)
+- [Universal Actions for Adaptive Cards](https://learn.microsoft.com/en-us/microsoftteams/platform/task-modules-and-cards/cards/universal-actions-for-adaptive-cards/overview)
+- [Actions - Adaptive Cards | Microsoft Learn](https://learn.microsoft.com/en-us/adaptive-cards/rendering-cards/actions)
+
+### State Machine Libraries
+- [Workflows and agents - LangChain JavaScript](https://docs.langchain.com/oss/javascript/langgraph/workflows-agents)
+- [Choosing the Right Multi-Agent Architecture](https://blog.langchain.com/choosing-the-right-multi-agent-architecture/)
+- [GitHub - nickuraltsev/finity: A finite state machine library for Node.js](https://github.com/nickuraltsev/finity)
 
 ---
 
-*Feature research for: Enterprise chat UI — Copilot Studio + Adaptive Cards (React/Node, custom canvas)*
-*Researched: 2026-02-19*
+*Feature research for: Workflow Orchestrator + Structured Output Parsing (v1.5 milestone)*
+*Researched: 2026-02-21*
+*Confidence: HIGH*
