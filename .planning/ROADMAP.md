@@ -7,6 +7,7 @@
 - ✅ **v1.2 Auth** — Phases 5–7 (shipped 2026-02-21)
 - ✅ **v1.3b Copilot Studio SDK: Orchestrator Readiness** — Phases 8–10 (shipped 2026-02-21)
 - ✅ **v1.4 Persistent State Store** — Phases 11–14 (shipped 2026-02-22)
+- 🚧 **v1.5 Workflow Orchestrator + Structured Output Parsing** — Phases 15–17 (in progress)
 
 ## Phases
 
@@ -64,6 +65,52 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
 
 </details>
 
+### 🚧 v1.5 Workflow Orchestrator + Structured Output Parsing (In Progress)
+
+**Milestone Goal:** Transform the Node server from a stateless proxy into a Workflow Orchestrator that parses structured output from Copilot responses, maintains per-conversation workflow state in Redis, enriches outbound queries with accumulated context, and routes all existing endpoints through the orchestrator — while preserving passthrough behavior when Copilot returns unstructured text.
+
+- [ ] **Phase 15: Parser + Context Builder** - Shared schemas, multi-strategy structured output parser, and configurable context builder
+- [ ] **Phase 16: Workflow Orchestrator Engine** - Stateful orchestration service with Redis persistence, per-conversation locking, and context accumulation
+- [ ] **Phase 17: Route Integration + Compatibility** - Wire orchestrator into all chat routes, update API schemas, validate backward compatibility, and ship integration tests
+
+## Phase Details
+
+### Phase 15: Parser + Context Builder
+**Goal**: Structured output can be reliably extracted from any Copilot response format, and outbound queries can be enriched with a configurable workflow context preamble
+**Depends on**: Phase 14 (Redis store, error handling, JWT claim integration all complete)
+**Requirements**: PARSE-01, PARSE-02, PARSE-03, PARSE-04, PARSE-05, CTX-01, CTX-02, CTX-03
+**Success Criteria** (what must be TRUE):
+  1. A Copilot response containing structured JSON (in activity.value, activity.entities, or a JSON code block in text) produces a ParsedTurn with populated data and nextAction fields
+  2. A Copilot response containing only plain text produces a ParsedTurn in passthrough mode with parseErrors empty and no data fields set
+  3. A malformed or unparseable Copilot response produces a ParsedTurn where parseErrors contains the failure reason and the parser does not throw
+  4. The context builder prepends a preamble to Copilot queries that includes current step, collected data summary, and turn number — and the preamble is truncated to the configured max length when it exceeds the limit
+  5. CopilotStructuredOutputSchema and ParsedTurn types are defined in shared/src/schemas/workflow.ts and importable from both server and (type-only) client
+**Plans**: TBD
+
+### Phase 16: Workflow Orchestrator Engine
+**Goal**: A WorkflowOrchestrator service manages the full per-turn loop (load state, enrich query, call Copilot, normalize, parse, update state, save) with atomic Redis state persistence and per-conversation sequential processing
+**Depends on**: Phase 15 (parser and context builder complete)
+**Requirements**: ORCH-01, ORCH-02, ORCH-03, ORCH-04, ORCH-05, ORCH-06, ORCH-07
+**Success Criteria** (what must be TRUE):
+  1. Starting a new workflow session creates a WorkflowState in Redis scoped to the conversation's userId and tenantId
+  2. After a second turn in the same conversation, the collected data from the first turn appears in the Copilot query context preamble
+  3. A card action submission flows through the orchestrator and produces a WorkflowResponse containing both the assistant messages and the updated workflowState
+  4. Killing and restarting the server mid-workflow and then sending another message resumes correctly from the persisted Redis state
+  5. Sending ten concurrent requests for the same conversationId results in all requests completing with a consistent final state (no data lost due to race conditions)
+**Plans**: TBD
+
+### Phase 17: Route Integration + Compatibility
+**Goal**: All three chat routes (/start, /send, /card-action) delegate to the orchestrator and return workflowState in their responses, while existing chat behavior is fully preserved when no structured output is present
+**Depends on**: Phase 16 (orchestrator service complete)
+**Requirements**: ROUTE-01, ROUTE-02, ROUTE-03, ROUTE-04, COMPAT-01, COMPAT-02, COMPAT-03, TEST-01, TEST-02, TEST-03
+**Success Criteria** (what must be TRUE):
+  1. Sending a plain text message through /api/chat/send returns the same messages content as v1.4 with an additional optional workflowState field that existing clients can safely ignore
+  2. Submitting an Adaptive Card action through /api/chat/card-action still passes through the allowlist validator before reaching the orchestrator, and allowlist violations still return 403
+  3. A client that sends no workflowContext and receives unstructured Copilot responses observes zero behavior change from v1.4 (identical message content, status codes, and error shapes)
+  4. The parser unit test suite covers JSON code block extraction, text-only passthrough, hybrid responses, and malformed input without any test throwing
+  5. A multi-turn integration test demonstrates that collectedData accumulates across three or more turns and appears in successive Copilot query preambles
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -82,3 +129,6 @@ Full phase details: `.planning/milestones/v1.4-ROADMAP.md`
 | 12. Redis Implementation + Resilience | v1.4 | 2/2 | Complete | 2026-02-22 |
 | 13. Route Integration + Tests | v1.4 | 1/1 | Complete | 2026-02-22 |
 | 14. Redis Error Differentiation | v1.4 | 1/1 | Complete | 2026-02-22 |
+| 15. Parser + Context Builder | v1.5 | 0/? | Not started | - |
+| 16. Workflow Orchestrator Engine | v1.5 | 0/? | Not started | - |
+| 17. Route Integration + Compatibility | v1.5 | 0/? | Not started | - |

@@ -90,37 +90,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARSE-01 | — | Pending |
-| PARSE-02 | — | Pending |
-| PARSE-03 | — | Pending |
-| PARSE-04 | — | Pending |
-| PARSE-05 | — | Pending |
-| ORCH-01 | — | Pending |
-| ORCH-02 | — | Pending |
-| ORCH-03 | — | Pending |
-| ORCH-04 | — | Pending |
-| ORCH-05 | — | Pending |
-| ORCH-06 | — | Pending |
-| ORCH-07 | — | Pending |
-| CTX-01 | — | Pending |
-| CTX-02 | — | Pending |
-| CTX-03 | — | Pending |
-| ROUTE-01 | — | Pending |
-| ROUTE-02 | — | Pending |
-| ROUTE-03 | — | Pending |
-| ROUTE-04 | — | Pending |
-| COMPAT-01 | — | Pending |
-| COMPAT-02 | — | Pending |
-| COMPAT-03 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
+| PARSE-01 | Phase 15 | Pending |
+| PARSE-02 | Phase 15 | Pending |
+| PARSE-03 | Phase 15 | Pending |
+| PARSE-04 | Phase 15 | Pending |
+| PARSE-05 | Phase 15 | Pending |
+| CTX-01 | Phase 15 | Pending |
+| CTX-02 | Phase 15 | Pending |
+| CTX-03 | Phase 15 | Pending |
+| ORCH-01 | Phase 16 | Pending |
+| ORCH-02 | Phase 16 | Pending |
+| ORCH-03 | Phase 16 | Pending |
+| ORCH-04 | Phase 16 | Pending |
+| ORCH-05 | Phase 16 | Pending |
+| ORCH-06 | Phase 16 | Pending |
+| ORCH-07 | Phase 16 | Pending |
+| ROUTE-01 | Phase 17 | Pending |
+| ROUTE-02 | Phase 17 | Pending |
+| ROUTE-03 | Phase 17 | Pending |
+| ROUTE-04 | Phase 17 | Pending |
+| COMPAT-01 | Phase 17 | Pending |
+| COMPAT-02 | Phase 17 | Pending |
+| COMPAT-03 | Phase 17 | Pending |
+| TEST-01 | Phase 17 | Pending |
+| TEST-02 | Phase 17 | Pending |
+| TEST-03 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after initial definition*
+*Last updated: 2026-02-22 — traceability filled after v1.5 roadmap creation*
