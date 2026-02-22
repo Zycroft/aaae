@@ -132,11 +132,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
-<<<<<<< HEAD
-**Current state (v1.5 Phase 15 complete):** 15 phases, 41 plans shipped across 5 milestones (v1.0–v1.4) + Phase 15 of v1.5. Structured output parser and context builder shipped: CopilotStructuredOutputSchema with .passthrough() for forward compatibility, parseTurn() with non-throwing contract (ParsedTurn discriminated union), buildContextualQuery() with configurable preamble and max-length truncation. 116 unit tests across 9 test files.
-=======
 **Current state (v1.5 shipped):** 18 phases, 50 plans shipped across 6 milestones (v1.0–v1.5). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, and workflow orchestration. 147 tests, all passing.
->>>>>>> gsd/phase-18-phase16-verification-closure
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -211,16 +207,8 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | CopilotStructuredOutputSchema all fields optional + .passthrough() | Forward compatibility — Copilot responses may evolve, unknown fields should not break validation | ✓ Good — allows schema evolution without code changes |
 | Parser operates on NormalizedMessage[] not raw Activity[] | Reuse extractedPayload from activityNormalizer rather than re-extracting | ✓ Good — single responsibility, avoids redundant extraction |
 | ParsedTurn three-kind discriminated union (structured/passthrough/parse_error) | Distinguish "no data found" from "data found but invalid" — enables observability | ✓ Good — orchestrator can route decisions based on kind |
-<<<<<<< HEAD
-| Context builder default maxLength 2000 chars | Conservative estimate for Copilot token budget; configurable for tuning | TBD — Phase 18 observability will validate |
-| String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
-
----
-*Last updated: 2026-02-22 after Phase 15*
-=======
 | Context builder default maxLength 2000 chars | Conservative estimate for Copilot token budget; configurable for tuning | TBD — needs live validation |
 | String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
 
 ---
 *Last updated: 2026-02-22 after v1.5 milestone*
->>>>>>> gsd/phase-18-phase16-verification-closure
