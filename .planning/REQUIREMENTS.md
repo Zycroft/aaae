@@ -86,38 +86,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STORE-01 | — | Pending |
-| STORE-02 | — | Pending |
-| STORE-03 | — | Pending |
-| STORE-04 | — | Pending |
-| STORE-05 | — | Pending |
-| STORE-06 | — | Pending |
-| STORE-07 | — | Pending |
-| STATE-01 | — | Pending |
-| STATE-02 | — | Pending |
-| STATE-03 | — | Pending |
-| STATE-04 | — | Pending |
-| STATE-05 | — | Pending |
-| STATE-06 | — | Pending |
-| QUERY-01 | — | Pending |
-| QUERY-02 | — | Pending |
-| QUERY-03 | — | Pending |
-| RESIL-01 | — | Pending |
-| RESIL-02 | — | Pending |
-| RESIL-03 | — | Pending |
-| ROUTE-01 | — | Pending |
-| ROUTE-02 | — | Pending |
-| ROUTE-03 | — | Pending |
-| ROUTE-04 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
+| STORE-01 | Phase 11 | Pending |
+| STORE-02 | Phase 11 | Pending |
+| STORE-03 | Phase 11 | Pending |
+| STORE-04 | Phase 11 | Pending |
+| STORE-05 | Phase 12 | Pending |
+| STORE-06 | Phase 12 | Pending |
+| STORE-07 | Phase 12 | Pending |
+| STATE-01 | Phase 11 | Pending |
+| STATE-02 | Phase 11 | Pending |
+| STATE-03 | Phase 11 | Pending |
+| STATE-04 | Phase 11 | Pending |
+| STATE-05 | Phase 11 | Pending |
+| STATE-06 | Phase 11 | Pending |
+| QUERY-01 | Phase 11 | Pending |
+| QUERY-02 | Phase 12 | Pending |
+| QUERY-03 | Phase 12 | Pending |
+| RESIL-01 | Phase 12 | Pending |
+| RESIL-02 | Phase 12 | Pending |
+| RESIL-03 | Phase 12 | Pending |
+| ROUTE-01 | Phase 13 | Pending |
+| ROUTE-02 | Phase 13 | Pending |
+| ROUTE-03 | Phase 13 | Pending |
+| ROUTE-04 | Phase 13 | Pending |
+| TEST-01 | Phase 13 | Pending |
+| TEST-02 | Phase 13 | Pending |
+| TEST-03 | Phase 13 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after initial definition*
+*Last updated: 2026-02-21 after roadmap creation (Phases 11–13)*

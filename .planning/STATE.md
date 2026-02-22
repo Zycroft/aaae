@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.4 Persistent State Store (Azure Cache for Redis)
+**Current focus:** v1.4 Persistent State Store — Phase 11: StoredConversation Schema + Store Abstraction
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-21 — Milestone v1.4 started
+Phase: 11 of 13 for v1.4 (StoredConversation Schema + Store Abstraction)
+Plan: 0 of TBD in Phase 11
+Status: Ready to plan
+Last activity: 2026-02-21 — v1.4 roadmap created (Phases 11–13, 26 requirements mapped)
+
+Progress: [██████████░░░░░░░░░░] 10/13 phases complete (v1.0–v1.3b shipped)
 
 ## Performance Metrics
 
@@ -44,6 +46,13 @@ Last activity: 2026-02-21 — Milestone v1.4 started
 
 All decisions logged in PROJECT.md Key Decisions table.
 
+Recent decisions affecting v1.4:
+- Factory pattern: REDIS_URL present → RedisStore; absent → InMemoryStore (never both)
+- Fail-hard on Redis unavailability: 503 returned, no silent InMemory fallback
+- ioredis with rediss:// scheme for Azure Cache TLS (port 6380)
+- ioredis-mock for unit tests (no external Redis required in CI)
+- Store timestamps as ISO 8601 strings, validated through Zod on deserialization
+
 ### Pending Todos
 
 None.
@@ -52,11 +61,11 @@ None.
 
 - ESLint missing @react-eslint plugin — pre-existing tech debt, non-blocking
 - 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt, non-blocking
-- sdkConversationRef serialization risk: JSON round-trip must produce usable SDK reference (test explicitly in v1.4)
+- sdkConversationRef serialization risk: store conversationId string only, never the SDK reference object
 
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: v1.4 milestone initialization
-Resume file: .planning/STATE.md
-Next step: Define requirements → create roadmap
+Stopped at: v1.4 roadmap created — Phases 11, 12, 13 defined, all 26 requirements mapped
+Resume file: None
+Next step: /gsd:plan-phase 11
