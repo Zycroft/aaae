@@ -82,6 +82,26 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ Conversation continuity verified across 3+ SDK turns — v1.3b
 - ✓ Latency baselines measured (startConversation, sendMessage, full round-trip) — v1.3b
 - ✓ SDK-EVALUATION.md with CONDITIONAL GO recommendation for v1.5 — v1.3b
+- ✓ StoredConversation Zod schema with userId, tenantId, timestamps, status, workflow fields — v1.4 Phase 11
+- ✓ Backward-compatible defaults for StoredConversation (old records deserialize without error) — v1.4 Phase 11
+- ✓ ConversationStore interface with listByUser(userId) method — v1.4 Phase 11
+- ✓ InMemoryConversationStore with secondary userId index for efficient queries — v1.4 Phase 11
+- ✓ Store factory pattern selecting Redis or InMemory based on REDIS_URL — v1.4 Phase 11
+- ✓ Server logs active store backend on startup ([STORE] prefix) — v1.4 Phase 11
+- ✓ RedisConversationStore with ioredis: TLS (rediss://), per-key TTL (24h), commandTimeout (5s) — v1.4 Phase 12
+- ✓ Sorted-set secondary index for user-scoped queries (ZADD/ZREM/ZREVRANGEBYSCORE) — v1.4 Phase 12
+- ✓ Pipeline batching for atomic SET + ZADD + EXPIRE operations — v1.4 Phase 12
+- ✓ Factory validates rediss:// scheme at startup (process.exit on non-TLS) — v1.4 Phase 12
+- ✓ GET /health reports Redis connectivity (connected/disconnected/not_configured) — v1.4 Phase 12
+- ✓ ioredis retryStrategy with exponential backoff and [STORE] logging — v1.4 Phase 12
+- ✓ RedisStore unit tests with ioredis-mock (14 tests, no external Redis) — v1.4 Phase 12
+- ✓ server/.env.example documents REDIS_URL, REDIS_TTL, REDIS_TIMEOUT — v1.4 Phase 12
+- ✓ Chat routes extract userId (oid) and tenantId (tid) from JWT claims — v1.4 Phase 13
+- ✓ Orchestrate route uses JWT claims for both initial and history store calls — v1.4 Phase 13
+- ✓ AUTH_REQUIRED=false uses STUB_USER (oid='local-dev-oid', tid='local-dev-tenant') — v1.4 Phase 13
+- ✓ Factory pattern unit tests (InMemoryConversationStore, 7 tests) — v1.4 Phase 13
+- ✓ Route handlers return 503 for Redis errors vs 502 for Copilot Studio errors (isRedisError utility) — v1.4 Phase 14
+- ✓ isRedisError() detects redis-errors hierarchy by name + network error codes (16 test cases) — v1.4 Phase 14
 
 ### Active
 
@@ -112,7 +132,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
-**Current state (v1.3b SHIPPED):** 10 phases, 32 plans shipped across 4 milestones (v1.0–v1.3b). Full chat UI with Adaptive Cards, Entra External ID auth, and Copilot Studio SDK orchestrator infrastructure validated. CONDITIONAL GO for v1.5 Workflow Orchestrator — all code complete, pending live credential validation for latency and context injection measurements.
+**Current state (v1.4 complete):** 14 phases, 38 plans shipped across 5 milestones (v1.0–v1.4). Redis-backed persistent state store fully operational with ioredis TLS, per-key TTL, sorted-set user index, pipeline batching, health endpoint reporting, JWT claim integration in routes, Redis/Copilot error differentiation (503 vs 502), and 91 unit tests across 7 test files.
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -167,6 +187,22 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | WorkflowState schema for multi-turn state tracking | Per-conversation state (step, collectedData, lastRecommendation, turnCount) with LRU-backed store | ✓ Good — mirrors ConversationStore pattern |
 | Orchestrate endpoint starts fresh conversation per request | Simplifies orchestrator use; no pre-start needed | ✓ Good — batteries-included single call |
 | CONDITIONAL GO vs absolute GO | Latency + context injection live measurements pending credentials; code architecture is complete | ✓ Good — honest assessment, clear conditions |
+| Arrow function form for Zod datetime defaults | `.default(() => new Date().toISOString())` evaluated at parse time per record, not once at schema definition | ✓ Good — each old record gets unique timestamp |
+| sdkConversationRef as z.unknown() | Live SDK object never serialized to Redis; only conversationId string stored | ✓ Good — avoids class instance serialization issues |
+| Factory pattern for store selection | REDIS_URL drives selection; no silent fallback, no dual stores | ✓ Good — clean, testable, single responsibility |
+| RedisStore stub throws on all methods | Prevents silent misuse before Phase 12 implements real Redis operations | ✓ Good — fail-loud behavior |
+| Secondary userId index in InMemoryStore | Map<userId, Set<externalId>> enables O(1) listByUser without full-scan | ✓ Good — mirrors Redis sorted-set approach |
+| Named import `{ Redis }` from ioredis | NodeNext module resolution requires named export, not default import | ✓ Good — avoids TS2709 namespace-as-type error |
+| Pipeline for atomic SET + ZADD + EXPIRE | Reduces round trips, ensures consistency between conversation key and user index | ✓ Good — atomic operations, pipeline error checking |
+| User index TTL = conversation TTL + 1 hour | Prevents orphaned sorted-set entries when conversation key expires | ✓ Good — graceful degradation on TTL mismatch |
+| sdkConversationRef destructured before serialize | Live SDK object excluded from JSON.stringify; Zod parse on deserialize | ✓ Good — clean separation of serializable vs. runtime state |
+| Health endpoint `not_configured` state | Three states: connected/disconnected/not_configured — InMemory mode is not "disconnected" | ✓ Good — clear operator observability |
+| Exclude test files from tsc build | `"exclude": ["src/**/*.test.ts", "src/**/__tests__/**"]` — vitest handles test compilation | ✓ Good — fixes @types/ioredis-mock NodeNext incompatibility |
+| ioredis-mock flushall() in beforeEach | ioredis-mock instances share global data store — must flush between tests | ✓ Good — test isolation without side effects |
+| req.user.oid as userId, req.user.tid as tenantId | Azure AD oid is stable unique identifier; tid identifies tenant for multi-tenancy | ✓ Good — matches auth schema (UserClaims.oid, UserClaims.tid) |
+| Optional chaining with fallback (`req.user?.oid ?? 'anonymous'`) | Defensive coding even though auth middleware guarantees req.user | ✓ Good — safe against edge cases |
+| Factory tests use InMemoryConversationStore directly | Avoids config.ts side effects (process.exit) when importing factory singleton in test | ✓ Good — tests store behavior without env dependency |
+| Name-based Redis error detection (err.name) over instanceof | ioredis v5 does not export TimeoutError; redis-errors package hierarchy detectable via error name | ✓ Good — more comprehensive, covers 7 error classes |
 
 ---
-*Last updated: 2026-02-21 after v1.4 milestone start*
+*Last updated: 2026-02-22 after Phase 14 — v1.4 milestone complete*

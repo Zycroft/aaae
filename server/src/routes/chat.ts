@@ -11,6 +11,7 @@ import { validateCardAction } from '../allowlist/cardActionAllowlist.js';
 import { copilotClient } from '../copilot.js';
 import { conversationStore } from '../store/index.js';
 import { normalizeActivities } from '../normalizer/activityNormalizer.js';
+import { isRedisError } from '../utils/errorDetection.js';
 
 /**
  * Builds a structured context prefix for Copilot messages.
@@ -44,7 +45,7 @@ export const chatRouter = Router();
  *
  * SERV-02
  */
-chatRouter.post('/start', async (_req, res) => {
+chatRouter.post('/start', async (req, res) => {
   try {
     const externalId = uuidv4(); // The conversationId we return to clients
     const collectedActivities: Activity[] = [];
@@ -55,16 +56,26 @@ chatRouter.post('/start', async (_req, res) => {
       collectedActivities.push(activity);
     }
 
+    const now = new Date().toISOString();
     await conversationStore.set(externalId, {
       externalId,
       sdkConversationRef: collectedActivities, // Store raw activities for Phase 2 normalizer
       history: [], // Message history populated in Phase 2
+      userId: req.user?.oid ?? 'anonymous',
+      tenantId: req.user?.tid ?? 'dev',
+      createdAt: now,
+      updatedAt: now,
+      status: 'active',
     });
 
     res.status(200).json({ conversationId: externalId });
   } catch (err) {
     console.error('[chat/start] Error starting conversation:', err);
-    res.status(502).json({ error: 'Failed to start conversation with Copilot Studio' });
+    if (isRedisError(err)) {
+      res.status(503).json({ error: 'Service Unavailable: Redis backend offline' });
+    } else {
+      res.status(502).json({ error: 'Failed to start conversation with Copilot Studio' });
+    }
   }
 });
 
@@ -119,13 +130,18 @@ chatRouter.post('/send', async (req, res) => {
     await conversationStore.set(conversationId, {
       ...conversation,
       history: [...conversation.history, ...messages],
+      updatedAt: new Date().toISOString(),
     });
 
     // 7. Return response
     res.status(200).json({ conversationId, messages });
   } catch (err) {
     console.error('[chat/send] Error sending message:', err);
-    res.status(502).json({ error: 'Failed to send message to Copilot Studio' });
+    if (isRedisError(err)) {
+      res.status(503).json({ error: 'Service Unavailable: Redis backend offline' });
+    } else {
+      res.status(502).json({ error: 'Failed to send message to Copilot Studio' });
+    }
   }
 });
 
@@ -186,12 +202,17 @@ chatRouter.post('/card-action', async (req, res) => {
     await conversationStore.set(conversationId, {
       ...conversation,
       history: [...conversation.history, ...messages],
+      updatedAt: new Date().toISOString(),
     });
 
     // 8. Return normalized messages
     res.status(200).json({ conversationId, messages });
   } catch (err) {
     console.error('[chat/card-action] Error forwarding card action:', err);
-    res.status(502).json({ error: 'Failed to forward card action to Copilot Studio' });
+    if (isRedisError(err)) {
+      res.status(503).json({ error: 'Service Unavailable: Redis backend offline' });
+    } else {
+      res.status(502).json({ error: 'Failed to forward card action to Copilot Studio' });
+    }
   }
 });

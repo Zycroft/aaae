@@ -11,6 +11,7 @@ import { copilotClient } from '../copilot.js';
 import { conversationStore, workflowStateStore } from '../store/index.js';
 import { normalizeActivities } from '../normalizer/activityNormalizer.js';
 import { buildContextPrefix } from './chat.js';
+import { isRedisError } from '../utils/errorDetection.js';
 
 export const orchestrateRouter = Router();
 
@@ -48,10 +49,16 @@ orchestrateRouter.post('/', async (req, res) => {
 
     // 3. Generate conversationId and store conversation
     const conversationId = uuidv4();
+    const now = new Date().toISOString();
     await conversationStore.set(conversationId, {
       externalId: conversationId,
       sdkConversationRef: startActivities,
       history: [],
+      userId: req.user?.oid ?? 'anonymous',
+      tenantId: req.user?.tid ?? 'dev',
+      createdAt: now,
+      updatedAt: now,
+      status: 'active',
     });
 
     // 4. Build outbound text with optional context prefix
@@ -103,6 +110,11 @@ orchestrateRouter.post('/', async (req, res) => {
       externalId: conversationId,
       sdkConversationRef: startActivities,
       history: messages,
+      userId: req.user?.oid ?? 'anonymous',
+      tenantId: req.user?.tid ?? 'dev',
+      createdAt: now,
+      updatedAt: new Date().toISOString(),
+      status: 'active',
     });
 
     // 10. Return response
@@ -115,6 +127,10 @@ orchestrateRouter.post('/', async (req, res) => {
     });
   } catch (err) {
     console.error('[chat/orchestrate] Error:', err);
-    res.status(502).json({ error: 'Failed to communicate with Copilot Studio' });
+    if (isRedisError(err)) {
+      res.status(503).json({ error: 'Service Unavailable: Redis backend offline' });
+    } else {
+      res.status(502).json({ error: 'Failed to communicate with Copilot Studio' });
+    }
   }
 });

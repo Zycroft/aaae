@@ -34,6 +34,11 @@ export {
 } from './schemas/workflowState.js';
 
 export {
+  StoredConversationSchema,
+  type StoredConversation,
+} from './schemas/storedConversation.js';
+
+export {
   StartConversationResponseSchema,
   type StartConversationResponse,
   SendMessageRequestSchema,

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
+import { getRedisClient } from './store/index.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgAllowlist } from './middleware/orgAllowlist.js';
 import { chatRouter } from './routes/chat.js';
@@ -20,9 +21,24 @@ export function createApp() {
 
   app.use(express.json());
 
-  // Health check — unauthenticated so dev tools can probe without a token
+  // Health check — unauthenticated so dev tools can probe without a token (RESIL-02)
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', authRequired: config.AUTH_REQUIRED });
+    const redisClient = getRedisClient();
+
+    let redisStatus: 'connected' | 'disconnected' | 'not_configured';
+    if (!redisClient) {
+      redisStatus = 'not_configured';
+    } else {
+      // ioredis status values: 'wait', 'reconnecting', 'connecting', 'connect', 'ready', 'close', 'end'
+      // Only 'ready' means connected and accepting commands
+      redisStatus = redisClient.status === 'ready' ? 'connected' : 'disconnected';
+    }
+
+    res.json({
+      status: 'ok',
+      authRequired: config.AUTH_REQUIRED,
+      redis: redisStatus,
+    });
   });
 
   // All /api routes require auth (SERV-09)

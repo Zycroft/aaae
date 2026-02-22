@@ -34,7 +34,7 @@ Requirements for Persistent State Store (Azure Cache for Redis). Each maps to ro
 
 ### Resilience
 
-- [ ] **RESIL-01**: Server returns 503 Service Unavailable when Redis is unreachable
+- [x] **RESIL-01**: Server returns 503 Service Unavailable when Redis is unreachable
 - [ ] **RESIL-02**: /health endpoint reports Redis connectivity status (connected/disconnected)
 - [ ] **RESIL-03**: Redis connection retries on transient errors with logging
 
@@ -102,7 +102,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUERY-01 | Phase 11 | Pending |
 | QUERY-02 | Phase 12 | Pending |
 | QUERY-03 | Phase 12 | Pending |
-| RESIL-01 | Phase 12 | Pending |
+| RESIL-01 | Phase 14 (gap closure) | Complete |
 | RESIL-02 | Phase 12 | Pending |
 | RESIL-03 | Phase 12 | Pending |
 | ROUTE-01 | Phase 13 | Pending |

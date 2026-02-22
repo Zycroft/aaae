@@ -1,20 +1,29 @@
-import type { NormalizedMessage } from '@copilot-chat/shared';
+import type { StoredConversation } from '@copilot-chat/shared';
 
-export interface StoredConversation {
-  /** Server-generated UUID — the external conversationId sent to clients */
-  externalId: string;
-  /**
-   * The internal Copilot SDK conversation reference.
-   * Typed as unknown here because the SDK type is only imported on the server.
-   * Routes cast this to the appropriate SDK type when needed.
-   */
-  sdkConversationRef: unknown;
-  /** Full message history for this conversation */
-  history: NormalizedMessage[];
-}
+export type { StoredConversation };
 
+/**
+ * ConversationStore — persistence abstraction for conversations.
+ *
+ * Implementations: InMemoryConversationStore (default), RedisConversationStore (REDIS_URL set).
+ * Factory in factory.ts selects the implementation at startup.
+ *
+ * STORE-03, QUERY-01
+ */
 export interface ConversationStore {
+  /** Retrieve conversation by externalId */
   get(id: string): Promise<StoredConversation | undefined>;
+
+  /** Store or update conversation */
   set(id: string, conversation: StoredConversation): Promise<void>;
+
+  /** Delete conversation by externalId */
   delete(id: string): Promise<void>;
+
+  /**
+   * List all conversations owned by a user, sorted most-recent-first by updatedAt.
+   * Returns an empty array when the user has no conversations.
+   * QUERY-01
+   */
+  listByUser(userId: string): Promise<StoredConversation[]>;
 }

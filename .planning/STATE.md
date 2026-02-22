@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-21)
+See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.4 Persistent State Store — Phase 11: StoredConversation Schema + Store Abstraction
+**Current focus:** v1.4 Persistent State Store — milestone complete, all 14 phases shipped
 
 ## Current Position
 
-Phase: 11 of 13 for v1.4 (StoredConversation Schema + Store Abstraction)
-Plan: 0 of TBD in Phase 11
-Status: Ready to plan
-Last activity: 2026-02-21 — v1.4 roadmap created (Phases 11–13, 26 requirements mapped)
+Phase: 14 of 14 for v1.4 (Redis Error Differentiation — gap closure)
+Plan: 1 of 1 in Phase 14
+Status: v1.4 milestone complete, all phases verified
+Last activity: 2026-02-22 — Phase 14 verified and complete
 
-Progress: [██████████░░░░░░░░░░] 10/13 phases complete (v1.0–v1.3b shipped)
+Progress: [████████████████████] 14/14 phases complete (v1.0–v1.3b shipped, v1.4 complete)
 
 ## Performance Metrics
 
@@ -52,6 +52,14 @@ Recent decisions affecting v1.4:
 - ioredis with rediss:// scheme for Azure Cache TLS (port 6380)
 - ioredis-mock for unit tests (no external Redis required in CI)
 - Store timestamps as ISO 8601 strings, validated through Zod on deserialization
+- Arrow function defaults for Zod datetime (.default(() => new Date().toISOString())) — per-record timestamps
+- sdkConversationRef as z.unknown() — never serialized to Redis, reconstructed in memory
+- Secondary userId index in InMemoryStore — Map<userId, Set<externalId>> mirrors Redis sorted-set approach
+- RedisStore fully implemented with ioredis: TLS validation, per-key TTL, sorted-set user index, pipeline batching
+- /health endpoint reports redis: connected/disconnected/not_configured
+- ioredis-mock for unit tests (14 tests, no external Redis needed)
+- Test files excluded from tsc build (vitest handles compilation)
+- Name-based Redis error detection (err.name) over instanceof: ioredis v5 does not export TimeoutError; redis-errors package hierarchy detectable via error name
 
 ### Pending Todos
 
@@ -61,11 +69,11 @@ None.
 
 - ESLint missing @react-eslint plugin — pre-existing tech debt, non-blocking
 - 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt, non-blocking
-- sdkConversationRef serialization risk: store conversationId string only, never the SDK reference object
+- sdkConversationRef serialization risk: store conversationId string only, never the SDK reference object (addressed in Phase 11 via z.unknown())
 
 ## Session Continuity
 
-Last session: 2026-02-21
-Stopped at: v1.4 roadmap created — Phases 11, 12, 13 defined, all 26 requirements mapped
+Last session: 2026-02-22
+Stopped at: v1.4 milestone complete — all 14 phases shipped and verified
 Resume file: None
-Next step: /gsd:plan-phase 11
+Next step: /gsd:complete-milestone v1.4

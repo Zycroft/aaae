@@ -36,4 +36,8 @@ export const config = {
   ALLOWED_TENANT_IDS: process.env.ALLOWED_TENANT_IDS
     ? process.env.ALLOWED_TENANT_IDS.split(',').map((id) => id.trim()).filter(Boolean)
     : [],
+  // Redis (Phase 12) — optional; when absent, InMemoryStore is used
+  REDIS_URL: process.env.REDIS_URL,
+  REDIS_TTL: Number(process.env.REDIS_TTL ?? 86400),       // Default: 24 hours in seconds
+  REDIS_TIMEOUT: Number(process.env.REDIS_TIMEOUT ?? 5000), // Default: 5 seconds in milliseconds
 } as const;

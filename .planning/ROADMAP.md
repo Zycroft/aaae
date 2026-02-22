@@ -6,7 +6,7 @@
 - ✅ **v1.1 Polish** — Phase 4 (shipped 2026-02-20)
 - ✅ **v1.2 Auth** — Phases 5–7 (shipped 2026-02-21)
 - ✅ **v1.3b Copilot Studio SDK: Orchestrator Readiness** — Phases 8–10 (shipped 2026-02-21)
-- 🚧 **v1.4 Persistent State Store (Azure Cache for Redis)** — Phases 11–13 (in progress)
+- **v1.4 Persistent State Store (Azure Cache for Redis)** — Phases 11–14 (13 shipped, 1 gap closure remaining)
 
 ## Phases
 
@@ -52,13 +52,14 @@ Full phase details: `.planning/milestones/v1.3b-ROADMAP.md`
 
 </details>
 
-### 🚧 v1.4 Persistent State Store (Azure Cache for Redis) (In Progress)
+### v1.4 Persistent State Store (Azure Cache for Redis)
 
 **Milestone Goal:** Replace in-memory conversation store with Redis-backed persistent state, preparing the expanded data model for the Workflow Orchestrator (v1.5).
 
-- [ ] **Phase 11: StoredConversation Schema + Store Abstraction** — Expanded schema in shared/, ConversationStore interface extended with listByUser, InMemoryStore updated, factory wired
-- [ ] **Phase 12: Redis Implementation + Resilience** — RedisStore with TLS, TTL, timeout, sorted-set user index, 503 on unavailability, connection retry, /health Redis reporting
-- [ ] **Phase 13: Route Integration + Tests** — Chat routes populate userId/tenantId/timestamps from JWT claims, auth bypass fallback, unit tests for RedisStore and factory, .env.example updated
+- [x] **Phase 11: StoredConversation Schema + Store Abstraction** — Expanded schema in shared/, ConversationStore interface extended with listByUser, InMemoryStore updated, factory wired (completed 2026-02-22)
+- [x] **Phase 12: Redis Implementation + Resilience** (2 plans) — RedisStore with TLS, TTL, timeout, sorted-set user index, 503 on unavailability, connection retry, /health Redis reporting (completed 2026-02-22)
+- [x] **Phase 13: Route Integration + Tests** (1 plan) — Chat routes populate userId/tenantId from JWT claims, factory unit tests (completed 2026-02-22)
+- [x] **Phase 14: Redis Error Differentiation** (1 plan) — Gap closure: route handlers return 503 for Redis errors vs 502 for Copilot Studio errors (completed 2026-02-22)
 
 ## Phase Details
 
@@ -99,7 +100,11 @@ Plans:
   5. GET /health reports Redis as "connected" or "disconnected" so an operator can verify Redis availability without reading server logs
   6. When Redis is unreachable, the server returns 503 Service Unavailable — it never silently serves stale in-memory data
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [x] 12-01-PLAN.md — Install ioredis, implement RedisConversationStore with TLS/TTL/timeout/sorted-set/pipeline, update factory with TLS validation (STORE-05, STORE-06, STORE-07, QUERY-02, QUERY-03, RESIL-01, RESIL-03)
+- [x] 12-02-PLAN.md — Health endpoint Redis status, ioredis-mock unit tests, .env.example Redis docs (RESIL-02)
 
 ### Phase 13: Route Integration + Tests
 
@@ -116,6 +121,31 @@ Plans:
   4. When AUTH_REQUIRED=false, routes store userId as 'anonymous' and tenantId as 'dev' so local development works without credentials
   5. `npm test` passes with unit tests covering RedisStore (via ioredis-mock) and the factory pattern, and server/.env.example documents all new Redis configuration variables
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 13-01-PLAN.md — Wire JWT claims into route userId/tenantId, factory unit tests (ROUTE-01, TEST-02)
+
+### Phase 14: Redis Error Differentiation
+
+**Goal**: Route error handlers distinguish Redis errors from Copilot Studio errors and return 503 Service Unavailable for Redis unavailability, so operators can differentiate backend failures in monitoring.
+
+**Depends on**: Phase 13
+
+**Requirements**: RESIL-01
+
+**Gap Closure**: Closes RESIL-01 gap and Phase 12→13 integration gap identified in v1.4-MILESTONE-AUDIT.md
+
+**Success Criteria** (what must be TRUE):
+  1. When Redis is unreachable, POST /api/chat/start, /send, /card-action, and /orchestrate all return 503 (not 502)
+  2. When Copilot Studio fails, routes still return 502 Bad Gateway (no regression)
+  3. Unit tests verify 503 is returned for Redis-originated errors
+
+**Plans**: 1 plan
+
+Plans:
+- [x] 14-01-PLAN.md — Add Redis error detection to route catch blocks, return 503 for store errors + unit tests (RESIL-01)
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -130,6 +160,7 @@ Plans:
 | 8. SDK Capability Audit + Structured Extraction | v1.3b | 3/3 | Complete | 2026-02-21 |
 | 9. Context Injection + Multi-Turn Validation | v1.3b | 3/3 | Complete | 2026-02-21 |
 | 10. Orchestrate Endpoint + Evaluation | v1.3b | 3/3 | Complete | 2026-02-21 |
-| 11. StoredConversation Schema + Store Abstraction | v1.4 | 0/TBD | Not started | - |
-| 12. Redis Implementation + Resilience | v1.4 | 0/TBD | Not started | - |
-| 13. Route Integration + Tests | v1.4 | 0/TBD | Not started | - |
+| 11. StoredConversation Schema + Store Abstraction | 2/2 | Complete    | 2026-02-22 | - |
+| 12. Redis Implementation + Resilience | v1.4 | 2/2 | Complete | 2026-02-22 |
+| 13. Route Integration + Tests | v1.4 | 1/1 | Complete | 2026-02-22 |
+| 14. Redis Error Differentiation | 1/1 | Complete    | 2026-02-22 | - |
