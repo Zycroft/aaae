@@ -8,6 +8,7 @@
 - ✅ **v1.3b Copilot Studio SDK: Orchestrator Readiness** — Phases 8–10 (shipped 2026-02-21)
 - ✅ **v1.4 Persistent State Store** — Phases 11–14 (shipped 2026-02-22)
 - ✅ **v1.5 Workflow Orchestrator + Structured Output Parsing** — Phases 15–18 (shipped 2026-02-22)
+- 🚧 **v1.6 Dynamic Step-Driven UX** — Phases 19–22 (in progress)
 
 ## Phases
 
@@ -77,6 +78,66 @@ Full phase details: `.planning/milestones/v1.5-ROADMAP.md`
 
 </details>
 
+### 🚧 v1.6 Dynamic Step-Driven UX (In Progress)
+
+**Milestone Goal:** Make the client workflow-aware — render server-driven progress, dynamic input modes, phase dividers, and completion summaries so the AI-driven orchestrator can guide users through multi-step workflows.
+
+- [ ] **Phase 19: WorkflowState Schema + Client State Foundation** — Extend shared/ Zod schemas and wire useChatApi hook to track workflow state
+- [ ] **Phase 20: Shell Wiring + Progress Indicator + Transcript** — Wire ChatShell, render WorkflowProgress bar, add phase dividers and system messages
+- [ ] **Phase 21: Dynamic Input + Completion + MetadataPane** — Dynamic ChatInput modes, WorkflowComplete view, MetadataPane workflow data section
+- [ ] **Phase 22: Integration Testing** — End-to-end multi-step workflow integration test validating full phase-transition cycle
+
+## Phase Details
+
+### Phase 19: WorkflowState Schema + Client State Foundation
+**Goal**: The shared type contract for workflow state exists and the client hook tracks it — all downstream UI components have a typed, reactive source of truth to consume
+**Depends on**: Phase 18 (v1.5 complete; server already returns workflowState)
+**Requirements**: SCHEMA-01, SCHEMA-02, SCHEMA-03, STATE-01, STATE-02, STATE-03, COMPAT-01, COMPAT-02
+**Success Criteria** (what must be TRUE):
+  1. WorkflowState Zod schema exists in shared/ with all required fields (status, currentPhase, progress, collectedData, suggestedInputType, choices) and TypeScript types are inferred from it
+  2. SendMessageResponse and CardActionResponse schemas include an optional workflowState field that passes Zod validation with or without it present
+  3. useChatApi hook exposes workflowState and resetConversation() to consumers, updating state on every send/cardAction response
+  4. A chat session with no workflowState in the server response renders identically to v1.1 — no regression, no broken layout
+  5. No hardcoded phase names or step counts appear anywhere in client code — all workflow rendering data flows from server response
+**Plans**: TBD
+
+### Phase 20: Shell Wiring + Progress Indicator + Transcript
+**Goal**: The chat shell passes workflow state to child components and the transcript visually reflects workflow progress — users see a phase label, a progress bar, and clear dividers between workflow phases
+**Depends on**: Phase 19
+**Requirements**: SHELL-01, SHELL-02, PROG-01, PROG-02, PROG-03, TRANS-01, TRANS-02, COMPAT-03, TEST-01
+**Success Criteria** (what must be TRUE):
+  1. WorkflowProgress component appears above the transcript when a workflow is active, showing the currentPhase label and a filled progress bar (0–100%) or a pulsing indeterminate bar when progress is null
+  2. WorkflowProgress hides completely when no workflow is active, with no layout shift
+  3. Phase transitions animate smoothly — changing from one phase to the next does not flicker or jump
+  4. Phase divider lines appear in the transcript at the point where currentPhase changes between consecutive messages
+  5. Orchestrator status messages render as centered, muted text without speech bubbles — visually distinct from user/assistant messages
+  6. ChatShell surfaces a visible error state with a retry option when workflowState.status is 'error'
+  7. All new components are responsive at 360px, 768px, and 1280px widths and render correctly in both dark and light themes
+**Plans**: TBD
+
+### Phase 21: Dynamic Input + Completion + MetadataPane
+**Goal**: The chat input adapts to the workflow's requested mode, the completion view summarizes what was collected, and the metadata pane exposes accumulated workflow data — users can interact with the workflow using keyboard or pointer at every step
+**Depends on**: Phase 20
+**Requirements**: INPUT-01, INPUT-02, INPUT-03, INPUT-04, INPUT-05, COMPL-01, COMPL-02, COMPL-03, META-01, META-02, TEST-02, TEST-03
+**Success Criteria** (what must be TRUE):
+  1. When suggestedInputType is 'choice', ChatInput renders clickable pill buttons for each choice; selecting one sends the choice text; free-text input remains available as a fallback
+  2. When suggestedInputType is 'confirmation', ChatInput renders Yes and No buttons; free-text input remains available as a fallback
+  3. When suggestedInputType is 'none', ChatInput shows a visible disabled state with a status message explaining why input is unavailable
+  4. Choice pill overflow beyond six items shows a "Show more" toggle; all pill buttons and confirmation buttons are keyboard accessible (Tab, Enter, Space)
+  5. When workflowState.status is 'completed', WorkflowComplete renders with the collected data summary, a "Start new conversation" button that resets state, and a "Download summary" button that exports collected data as JSON
+  6. MetadataPane shows a "Workflow Data" section with accumulated collectedData key-value pairs; nested objects up to three levels deep are displayed inline; deeper structures show a "View full data" JSON viewer toggle
+**Plans**: TBD
+
+### Phase 22: Integration Testing
+**Goal**: A single integration test simulates a complete multi-step workflow from start to finish, verifying that phase transitions, input mode changes, and completion rendering all work in sequence — giving confidence that the assembled system behaves as designed
+**Depends on**: Phase 21
+**Requirements**: TEST-04
+**Success Criteria** (what must be TRUE):
+  1. An integration test drives a simulated multi-step workflow through at least two phase transitions and at least two different input modes (e.g., choice then confirmation), asserting the correct UI state at each step
+  2. The test verifies that resetConversation() returns the UI to its initial state with no workflow artifacts visible
+  3. All 30 v1.6 requirements are verified green (unit tests for components, integration test for full flow)
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -99,3 +160,7 @@ Full phase details: `.planning/milestones/v1.5-ROADMAP.md`
 | 16. Workflow Orchestrator Engine | v1.5 | 3/3 | Complete | 2026-02-22 |
 | 17. Route Integration + Compatibility | v1.5 | 3/3 | Complete | 2026-02-22 |
 | 18. Phase 16 Verification + Requirement Closure | v1.5 | 2/2 | Complete | 2026-02-22 |
+| 19. WorkflowState Schema + Client State Foundation | v1.6 | 0/? | Not started | - |
+| 20. Shell Wiring + Progress Indicator + Transcript | v1.6 | 0/? | Not started | - |
+| 21. Dynamic Input + Completion + MetadataPane | v1.6 | 0/? | Not started | - |
+| 22. Integration Testing | v1.6 | 0/? | Not started | - |

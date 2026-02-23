@@ -91,42 +91,42 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-01 | — | Pending |
-| SCHEMA-02 | — | Pending |
-| SCHEMA-03 | — | Pending |
-| PROG-01 | — | Pending |
-| PROG-02 | — | Pending |
-| PROG-03 | — | Pending |
-| INPUT-01 | — | Pending |
-| INPUT-02 | — | Pending |
-| INPUT-03 | — | Pending |
-| INPUT-04 | — | Pending |
-| INPUT-05 | — | Pending |
-| COMPL-01 | — | Pending |
-| COMPL-02 | — | Pending |
-| COMPL-03 | — | Pending |
-| TRANS-01 | — | Pending |
-| TRANS-02 | — | Pending |
-| STATE-01 | — | Pending |
-| STATE-02 | — | Pending |
-| STATE-03 | — | Pending |
-| SHELL-01 | — | Pending |
-| SHELL-02 | — | Pending |
-| META-01 | — | Pending |
-| META-02 | — | Pending |
-| COMPAT-01 | — | Pending |
-| COMPAT-02 | — | Pending |
-| COMPAT-03 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
+| SCHEMA-01 | Phase 19 | Pending |
+| SCHEMA-02 | Phase 19 | Pending |
+| SCHEMA-03 | Phase 19 | Pending |
+| STATE-01 | Phase 19 | Pending |
+| STATE-02 | Phase 19 | Pending |
+| STATE-03 | Phase 19 | Pending |
+| COMPAT-01 | Phase 19 | Pending |
+| COMPAT-02 | Phase 19 | Pending |
+| SHELL-01 | Phase 20 | Pending |
+| SHELL-02 | Phase 20 | Pending |
+| PROG-01 | Phase 20 | Pending |
+| PROG-02 | Phase 20 | Pending |
+| PROG-03 | Phase 20 | Pending |
+| TRANS-01 | Phase 20 | Pending |
+| TRANS-02 | Phase 20 | Pending |
+| COMPAT-03 | Phase 20 | Pending |
+| TEST-01 | Phase 20 | Pending |
+| INPUT-01 | Phase 21 | Pending |
+| INPUT-02 | Phase 21 | Pending |
+| INPUT-03 | Phase 21 | Pending |
+| INPUT-04 | Phase 21 | Pending |
+| INPUT-05 | Phase 21 | Pending |
+| COMPL-01 | Phase 21 | Pending |
+| COMPL-02 | Phase 21 | Pending |
+| COMPL-03 | Phase 21 | Pending |
+| META-01 | Phase 21 | Pending |
+| META-02 | Phase 21 | Pending |
+| TEST-02 | Phase 21 | Pending |
+| TEST-03 | Phase 21 | Pending |
+| TEST-04 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.6 requirements: 30 total
-- Mapped to phases: 0
-- Unmapped: 30 (awaiting roadmap)
+- Mapped to phases: 30
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-22*
-*Last updated: 2026-02-22 after initial definition*
+*Last updated: 2026-02-22 after roadmap creation (v1.6, Phases 19–22)*

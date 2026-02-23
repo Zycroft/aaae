@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.6 Dynamic Step-Driven UX
+**Current focus:** v1.6 Dynamic Step-Driven UX — Phase 19
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-22 — Milestone v1.6 started
+Phase: 19 of 22 (WorkflowState Schema + Client State Foundation)
+Plan: — of — in current phase
+Status: Ready to plan
+Last activity: 2026-02-22 — v1.6 roadmap created (Phases 19–22, 30 requirements mapped)
 
-Progress: [░░░░░░░░░░░░░░░░░░░] 0/? phases (v1.6)
+Progress: [░░░░░░░░░░░░░░░░░░░] 0/4 phases (v1.6)
 
 ## Performance Metrics
 
@@ -28,20 +28,17 @@ Progress: [░░░░░░░░░░░░░░░░░░░] 0/? phases
 - Timeline: 2026-02-21 → 2026-02-22 (1 day)
 - Requirements: 26/26 fulfilled
 
-**v1.3b Velocity (shipped):**
-- Plans completed: 9 (Phase 8: 3, Phase 9: 3, Phase 10: 3)
-- Timeline: 2026-02-21 (1 day)
-- Requirements: 19/19 fulfilled
-
-**v1.2 Velocity (shipped):**
-- Plans completed: 7 (Phase 5: 2, Phase 6: 2, Phase 7: 3)
-- Requirements: 24/24 fulfilled
-
 ## Accumulated Context
 
 ### Decisions
 
 All decisions logged in PROJECT.md Key Decisions table.
+
+Recent decisions affecting v1.6:
+- v1.6 is client-only; server (v1.5 orchestrator) already returns workflowState — no server changes needed
+- No new npm dependencies for UI — use existing React 18 + CSS only
+- Shared/ Zod schema must be rebuilt after SCHEMA changes (cd shared && npm run build)
+- COMPAT requirements are cross-cutting — distributed across phases where components are built, not isolated
 
 ### Pending Todos
 
@@ -51,10 +48,11 @@ None.
 
 - ESLint missing @react-eslint plugin — pre-existing tech debt, non-blocking
 - 3 pre-existing lint errors in AdaptiveCardMessage.tsx and ChatInput.tsx — known debt, non-blocking
+- Context builder maxLength 2000 chars default — needs live validation with real Copilot workloads (carried from v1.5)
 
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: v1.6 milestone initialized, defining requirements.
+Stopped at: v1.6 roadmap created — 4 phases, 30 requirements mapped 30/30.
 Resume file: None
-Next step: Define requirements → create roadmap
+Next step: /gsd:plan-phase 19
