@@ -116,7 +116,19 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-(No active milestone — run `/gsd:new-milestone` to start next)
+#### Current Milestone: v1.6 Dynamic Step-Driven UX
+
+**Goal:** Make the client workflow-aware — render server-driven progress, dynamic input modes (choice pills, confirmation buttons), phase dividers, and completion summaries so the AI-driven orchestrator can guide users through multi-step workflows.
+
+**Target features:**
+- Extended message schema with workflowState in API responses
+- Workflow progress indicator (phase label + progress bar)
+- Dynamic input component (text/choice/confirmation/none modes)
+- Workflow completion view with collected data summary
+- Phase dividers and system messages in transcript
+- Workflow data accumulation in MetadataPane
+- Updated useChatApi hook with workflow state management
+- Graceful degradation — no workflow state = pure chat (v1.1 behavior)
 
 ### Out of Scope
 
@@ -132,7 +144,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
-**Current state (v1.5 shipped):** 18 phases, 50 plans shipped across 6 milestones (v1.0–v1.5). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, and workflow orchestration. 147 tests, all passing.
+**Current state (v1.6 in progress):** 18 phases, 50 plans shipped across 6 milestones (v1.0–v1.5). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, and workflow orchestration. 147 tests, all passing. Now adding workflow-aware UX to the client.
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -211,4 +223,4 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
 
 ---
-*Last updated: 2026-02-22 after v1.5 milestone*
+*Last updated: 2026-02-22 after v1.6 milestone start*

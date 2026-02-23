@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-22)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** Planning next milestone
+**Current focus:** v1.6 Dynamic Step-Driven UX
 
 ## Current Position
 
-Phase: None — between milestones
-Plan: N/A
-Status: v1.5 shipped, archived
-Last activity: 2026-02-22 — v1.5 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-22 — Milestone v1.6 started
 
-Progress: [████████████████████] 18/18 phases complete (v1.0–v1.5 shipped)
+Progress: [░░░░░░░░░░░░░░░░░░░] 0/? phases (v1.6)
 
 ## Performance Metrics
 
@@ -55,6 +55,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: v1.5 milestone archived.
+Stopped at: v1.6 milestone initialized, defining requirements.
 Resume file: None
-Next step: `/gsd:new-milestone` — start next milestone
+Next step: Define requirements → create roadmap
