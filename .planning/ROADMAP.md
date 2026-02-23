@@ -83,6 +83,9 @@ Full phase details: `.planning/milestones/v1.5-ROADMAP.md`
 **Milestone Goal:** Make the client workflow-aware — render server-driven progress, dynamic input modes, phase dividers, and completion summaries so the AI-driven orchestrator can guide users through multi-step workflows.
 
 - [ ] **Phase 19: WorkflowState Schema + Client State Foundation** — Extend shared/ Zod schemas and wire useChatApi hook to track workflow state
+  - **Plans**: 2 plans
+  - [ ] 19-01-PLAN.md — Extend WorkflowState schema with v1.6 UX fields (TDD)
+  - [ ] 19-02-PLAN.md — Update chatApi return types + useChatApi state + resetConversation
 - [ ] **Phase 20: Shell Wiring + Progress Indicator + Transcript** — Wire ChatShell, render WorkflowProgress bar, add phase dividers and system messages
 - [ ] **Phase 21: Dynamic Input + Completion + MetadataPane** — Dynamic ChatInput modes, WorkflowComplete view, MetadataPane workflow data section
 - [ ] **Phase 22: Integration Testing** — End-to-end multi-step workflow integration test validating full phase-transition cycle
@@ -99,7 +102,11 @@ Full phase details: `.planning/milestones/v1.5-ROADMAP.md`
   3. useChatApi hook exposes workflowState and resetConversation() to consumers, updating state on every send/cardAction response
   4. A chat session with no workflowState in the server response renders identically to v1.1 — no regression, no broken layout
   5. No hardcoded phase names or step counts appear anywhere in client code — all workflow rendering data flows from server response
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 19-01-PLAN.md — Extend WorkflowState schema with v1.6 UX fields (TDD)
+- [ ] 19-02-PLAN.md — Update chatApi return types + useChatApi state + resetConversation
 
 ### Phase 20: Shell Wiring + Progress Indicator + Transcript
 **Goal**: The chat shell passes workflow state to child components and the transcript visually reflects workflow progress — users see a phase label, a progress bar, and clear dividers between workflow phases
