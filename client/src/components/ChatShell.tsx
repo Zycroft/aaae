@@ -7,6 +7,8 @@ import { TranscriptView } from './TranscriptView.js';
 import { ChatInput } from './ChatInput.js';
 import { ThemeToggle } from './ThemeToggle.js';
 import { MetadataPane } from './MetadataPane.js';
+import { WorkflowProgress } from './WorkflowProgress.js';
+import { WorkflowComplete } from './WorkflowComplete.js';
 import { loginRequest, msalInstance } from '../auth/msalConfig.js';
 
 /**
@@ -18,7 +20,7 @@ import { loginRequest, msalInstance } from '../auth/msalConfig.js';
  * Acquires Bearer tokens silently before each API call (CAUTH-04, CAUTH-07).
  * Provides sign-out capability (CAUTH-06).
  *
- * UI-01, UI-02, UI-03, UI-04, UI-05, UI-07, UI-09, UI-13, CAUTH-04, CAUTH-05, CAUTH-06, CAUTH-07
+ * UI-01, UI-02, UI-03, UI-04, UI-05, UI-07, UI-09, UI-13, SHELL-01, SHELL-02, CAUTH-04, CAUTH-05, CAUTH-06, CAUTH-07
  */
 export function ChatShell() {
   const { instance, accounts } = useMsal();
@@ -60,7 +62,7 @@ export function ChatShell() {
     });
   }
 
-  const { messages, isLoading, error, sendMessage, cardAction } = useChatApi({ getToken });
+  const { messages, isLoading, error, sendMessage, cardAction, workflowState, resetConversation } = useChatApi({ getToken });
 
   return (
     <div className="appLayout">
@@ -68,6 +70,20 @@ export function ChatShell() {
       <div className="chatPane">
         <div className="chatShell">
           {error && <div className="globalError">{error}</div>}
+          {workflowState?.status === 'error' && (
+            <div className="workflowError" role="alert">
+              <span className="workflowErrorMessage">
+                The workflow encountered an error.
+              </span>
+              <button
+                type="button"
+                className="workflowErrorRetry"
+                onClick={resetConversation}
+              >
+                Start over
+              </button>
+            </div>
+          )}
           <div className="chatHeader">
             <ThemeToggle theme={theme} onToggle={toggle} />
             <button
@@ -79,12 +95,24 @@ export function ChatShell() {
               Sign out
             </button>
           </div>
-          <TranscriptView messages={messages} isLoading={isLoading} onCardAction={cardAction} />
-          <ChatInput onSend={sendMessage} disabled={isLoading} />
+          <WorkflowProgress workflowState={workflowState} />
+          {workflowState?.status === 'completed' ? (
+            <WorkflowComplete workflowState={workflowState} onReset={resetConversation} />
+          ) : (
+            <>
+              <TranscriptView messages={messages} isLoading={isLoading} onCardAction={cardAction} />
+              <ChatInput
+                onSend={sendMessage}
+                disabled={isLoading}
+                suggestedInputType={workflowState?.suggestedInputType}
+                choices={workflowState?.choices}
+              />
+            </>
+          )}
         </div>
       </div>
       {/* Phase 4: metadata drawer — UI-11, UI-12 */}
-      <MetadataPane messages={messages} />
+      <MetadataPane messages={messages} workflowState={workflowState} />
     </div>
   );
 }

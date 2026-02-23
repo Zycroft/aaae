@@ -1,4 +1,4 @@
-import type { NormalizedMessage } from '@copilot-chat/shared';
+import type { NormalizedMessage, WorkflowState } from '@copilot-chat/shared';
 
 /**
  * Raw HTTP fetch wrappers for the chat API.
@@ -18,7 +18,7 @@ import type { NormalizedMessage } from '@copilot-chat/shared';
 export async function startConversation(
   token: string,
   signal?: AbortSignal,
-): Promise<{ conversationId: string }> {
+): Promise<{ conversationId: string; workflowState?: WorkflowState }> {
   const response = await fetch('/api/chat/start', {
     method: 'POST',
     headers: {
@@ -35,7 +35,7 @@ export async function startConversation(
     );
   }
 
-  return response.json() as Promise<{ conversationId: string }>;
+  return response.json() as Promise<{ conversationId: string; workflowState?: WorkflowState }>;
 }
 
 /**
@@ -48,7 +48,7 @@ export async function sendMessage(
   text: string,
   token: string,
   signal?: AbortSignal,
-): Promise<{ conversationId: string; messages: NormalizedMessage[] }> {
+): Promise<{ conversationId: string; messages: NormalizedMessage[]; workflowState?: WorkflowState }> {
   const response = await fetch('/api/chat/send', {
     method: 'POST',
     headers: {
@@ -66,7 +66,7 @@ export async function sendMessage(
     );
   }
 
-  return response.json() as Promise<{ conversationId: string; messages: NormalizedMessage[] }>;
+  return response.json() as Promise<{ conversationId: string; messages: NormalizedMessage[]; workflowState?: WorkflowState }>;
 }
 
 /**
@@ -83,7 +83,7 @@ export async function sendCardAction(
   submitData: Record<string, unknown>,
   token: string,
   signal?: AbortSignal,
-): Promise<{ conversationId: string; messages: NormalizedMessage[] }> {
+): Promise<{ conversationId: string; messages: NormalizedMessage[]; workflowState?: WorkflowState }> {
   const response = await fetch('/api/chat/card-action', {
     method: 'POST',
     headers: {
@@ -101,5 +101,5 @@ export async function sendCardAction(
     );
   }
 
-  return response.json() as Promise<{ conversationId: string; messages: NormalizedMessage[] }>;
+  return response.json() as Promise<{ conversationId: string; messages: NormalizedMessage[]; workflowState?: WorkflowState }>;
 }

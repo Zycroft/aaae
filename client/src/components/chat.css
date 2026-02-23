@@ -176,6 +176,164 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   Workflow Error State (SHELL-02)
+   Banner with retry option when workflowState.status is 'error'
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.workflowError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-error-bg);
+  border-bottom: 1px solid var(--color-error-border);
+  flex-shrink: 0;
+}
+
+.workflowErrorMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-error-text);
+}
+
+.workflowErrorRetry {
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-error-text);
+  color: var(--color-bg);
+  border: none;
+  border-radius: 4px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity var(--transition-base);
+}
+
+.workflowErrorRetry:hover {
+  opacity: 0.85;
+}
+
+.workflowErrorRetry:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Workflow Complete (COMPL-01, COMPL-02, COMPL-03)
+   Summary card shown when workflow status is 'completed'.
+   Replaces transcript + input area in the chat shell layout.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.workflowComplete {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.workflowCompleteCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-5) var(--space-4);
+  max-width: 480px;
+  width: 100%;
+}
+
+.workflowCompleteHeading {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-4) 0;
+  text-align: center;
+}
+
+.workflowCompleteData {
+  margin: 0 0 var(--space-4) 0;
+  padding: 0;
+}
+
+.workflowCompleteDataRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.workflowCompleteDataRow:last-child {
+  border-bottom: none;
+}
+
+.workflowCompleteKey {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.workflowCompleteValue {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  text-align: right;
+  margin: 0;
+  word-break: break-word;
+}
+
+.workflowCompleteActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.workflowCompleteReset {
+  padding: 10px var(--space-4);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 4px;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-base);
+}
+
+.workflowCompleteReset:hover {
+  background: var(--color-primary-hover);
+}
+
+.workflowCompleteReset:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+.workflowCompleteDownload {
+  padding: 10px var(--space-4);
+  background: none;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--transition-base), color var(--transition-base);
+}
+
+.workflowCompleteDownload:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.workflowCompleteDownload:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Theme Toggle (UI-13)
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -238,6 +396,62 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   Workflow Progress Bar (PROG-01, PROG-02, PROG-03)
+   Shows phase label + progress bar above transcript when workflow active.
+   Hides via null render when inactive — no layout shift.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.workflowProgress {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.workflowProgressLabel {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+  transition: opacity 0.2s ease;
+}
+
+.workflowProgressTrack {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.workflowProgressBar {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Indeterminate: pulsing animation when progress is null */
+.workflowProgressBar.indeterminate {
+  width: 40%;
+  animation: progressPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes progressPulse {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Reduced motion: disable animation, show static bar */
+@media (prefers-reduced-motion: reduce) {
+  .workflowProgressBar.indeterminate {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Transcript
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -248,6 +462,49 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Phase Divider (TRANS-01)
+   Horizontal rule with phase label — appears at workflow phase transitions
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.phaseDivider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.phaseDivider::before,
+.phaseDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.phaseDividerLabel {
+  white-space: nowrap;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Orchestrator Status Messages (TRANS-02)
+   Centered, muted — no speech bubble or avatar.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.orchestratorStatus {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  padding: var(--space-1) var(--space-4);
+  user-select: none;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -558,6 +815,91 @@ body {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   Choice Pills + Confirmation Buttons (INPUT-01, INPUT-02, INPUT-04, INPUT-05)
+   Inline-flex row above textarea. Wraps naturally. Keyboard accessible.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.choicePillRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.choicePill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--transition-base);
+  white-space: nowrap;
+}
+
+.choicePill:hover {
+  border-color: var(--color-primary);
+}
+
+.choicePill:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+/* Primary pill (e.g., "Yes" in confirmation mode) */
+.choicePillPrimary {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}
+
+.choicePillPrimary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.showMoreToggle {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: 16px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-base), border-color var(--transition-base);
+}
+
+.showMoreToggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.showMoreToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-focus-ring);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Disabled Input Status (INPUT-03)
+   Status message when suggestedInputType is 'none'
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.inputDisabledStatus {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: var(--space-1) 0;
+  margin-bottom: var(--space-2);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    Utility: Screen-reader-only text
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -571,6 +913,78 @@ body {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Workflow Data Section in MetadataPane (META-01, META-02)
+   Shows accumulated collectedData above Activity Log.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.workflowDataSection {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.workflowDataList {
+  margin: var(--space-2) 0 0 0;
+  padding: 0;
+}
+
+.workflowDataEntry {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.workflowDataEntry:last-child {
+  border-bottom: none;
+}
+
+.workflowDataKey {
+  font-size: var(--font-size-xs);
+  font-family: monospace;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.workflowDataValue {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  margin: 0;
+  word-break: break-word;
+}
+
+.viewFullDataToggle {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  margin-bottom: var(--space-1);
+}
+
+.viewFullDataToggle:hover {
+  color: var(--color-primary-hover);
+}
+
+.viewFullDataToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.workflowDataJson {
+  font-size: var(--font-size-xs);
+  font-family: monospace;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: var(--space-2);
+  margin: var(--space-1) 0 0 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

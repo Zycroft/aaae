@@ -20,9 +20,18 @@ interface MessageBubbleProps {
  * - Status 'sending': subtle opacity
  * - Status 'error': inline error below bubble (UI-05)
  *
- * UI-02, UI-06, UI-07, UI-08, UI-10
+ * UI-02, UI-06, UI-07, UI-08, UI-10, TRANS-02
  */
 export function MessageBubble({ message, onCardAction }: MessageBubbleProps) {
+  // Orchestrator status messages: centered muted text, no bubble or avatar (TRANS-02)
+  if (message.subKind === 'orchestratorStatus') {
+    return (
+      <div className="orchestratorStatus" role="status">
+        <span>{message.text}</span>
+      </div>
+    );
+  }
+
   const isUser = message.role === 'user';
   const isSending = message.status === 'sending';
   const isError = message.status === 'error';

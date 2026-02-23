@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useRef } from 'react';
-import type { NormalizedMessage } from '@copilot-chat/shared';
+import type { NormalizedMessage, WorkflowState } from '@copilot-chat/shared';
 import { startConversation, sendMessage, sendCardAction } from '../api/chatApi.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -13,39 +13,47 @@ export type TranscriptMessage = NormalizedMessage & {
   status?: MessageStatus;
   errorMessage?: string;
   /** 'cardSubmit' = user bubble rendered as a chip after card submission (UI-10) */
-  subKind?: 'cardSubmit';
+  /** 'orchestratorStatus' = centered muted text, no speech bubble (TRANS-02) */
+  subKind?: 'cardSubmit' | 'orchestratorStatus';
+  /** Workflow phase label at the time this message was received (TRANS-01) */
+  workflowPhase?: string;
 };
 
-type State = {
+export type State = {
   conversationId: string | null;
   messages: TranscriptMessage[];
   /** true = skeleton loading row should be visible */
   isLoading: boolean;
   /** Global error (e.g., failed to start conversation) */
   error: string | null;
+  /** Server-returned workflow state — null when absent or before first response (STATE-01) */
+  workflowState: WorkflowState | null;
 };
 
-type Action =
+export type Action =
   | { type: 'INIT_CONVERSATION'; conversationId: string }
   | { type: 'ADD_OPTIMISTIC_MESSAGE'; message: TranscriptMessage }
   | { type: 'START_LOADING' }
-  | { type: 'SEND_SUCCESS'; optimisticId: string; botMessages: NormalizedMessage[] }
+  | { type: 'SEND_SUCCESS'; optimisticId: string; botMessages: NormalizedMessage[]; currentPhase?: string }
   | { type: 'SEND_ERROR'; optimisticId: string; errorMessage: string }
-  | { type: 'CARD_ACTION_SUCCESS'; optimisticId: string; botMessages: NormalizedMessage[] }
-  | { type: 'GLOBAL_ERROR'; error: string };
+  | { type: 'CARD_ACTION_SUCCESS'; optimisticId: string; botMessages: NormalizedMessage[]; currentPhase?: string }
+  | { type: 'GLOBAL_ERROR'; error: string }
+  | { type: 'SET_WORKFLOW_STATE'; workflowState: WorkflowState }
+  | { type: 'RESET_CONVERSATION' };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reducer
 // ─────────────────────────────────────────────────────────────────────────────
 
-const initialState: State = {
+export const initialState: State = {
   conversationId: null,
   messages: [],
   isLoading: false,
   error: null,
+  workflowState: null,
 };
 
-function reducer(state: State, action: Action): State {
+export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'INIT_CONVERSATION':
       return { ...state, conversationId: action.conversationId };
@@ -65,8 +73,12 @@ function reducer(state: State, action: Action): State {
           ...state.messages.map((m) =>
             m.id === action.optimisticId ? { ...m, status: 'sent' as const } : m
           ),
-          // Append all bot messages with 'sent' status
-          ...action.botMessages.map((m) => ({ ...m, status: 'sent' as const })),
+          // Append all bot messages with 'sent' status + workflow phase tag (TRANS-01)
+          ...action.botMessages.map((m) => ({
+            ...m,
+            status: 'sent' as const,
+            workflowPhase: action.currentPhase,
+          })),
         ],
       };
 
@@ -90,13 +102,23 @@ function reducer(state: State, action: Action): State {
           ...state.messages.map((m) =>
             m.id === action.optimisticId ? { ...m, status: 'sent' as const } : m
           ),
-          // Append all bot response messages with 'sent' status
-          ...action.botMessages.map((m) => ({ ...m, status: 'sent' as const })),
+          // Append all bot response messages with 'sent' status + workflow phase tag (TRANS-01)
+          ...action.botMessages.map((m) => ({
+            ...m,
+            status: 'sent' as const,
+            workflowPhase: action.currentPhase,
+          })),
         ],
       };
 
     case 'GLOBAL_ERROR':
       return { ...state, error: action.error };
+
+    case 'SET_WORKFLOW_STATE':
+      return { ...state, workflowState: action.workflowState };
+
+    case 'RESET_CONVERSATION':
+      return { ...initialState };
 
     default:
       return state;
@@ -187,6 +209,9 @@ export function useChatApi({ getToken }: { getToken: () => Promise<string> }) {
         const token = await getToken();
         const data = await startConversation(token, controller.signal);
         dispatch({ type: 'INIT_CONVERSATION', conversationId: data.conversationId });
+        if (data.workflowState) {
+          dispatch({ type: 'SET_WORKFLOW_STATE', workflowState: data.workflowState });
+        }
       } catch (err: unknown) {
         const error = err as Error;
         if (error.name !== 'AbortError') {
@@ -241,12 +266,16 @@ export function useChatApi({ getToken }: { getToken: () => Promise<string> }) {
       // 5. Cancel skeleton timer if response came back fast
       clearTimeout(skeletonTimer);
 
-      // 6. Dispatch success with bot messages
+      // 6. Dispatch success with bot messages + current phase for dividers (TRANS-01)
       dispatch({
         type: 'SEND_SUCCESS',
         optimisticId,
         botMessages: data.messages,
+        currentPhase: data.workflowState?.currentPhase,
       });
+      if (data.workflowState) {
+        dispatch({ type: 'SET_WORKFLOW_STATE', workflowState: data.workflowState });
+      }
     } catch (err) {
       clearTimeout(skeletonTimer);
       const error = err as Error;
@@ -310,11 +339,16 @@ export function useChatApi({ getToken }: { getToken: () => Promise<string> }) {
 
       clearTimeout(skeletonTimer);
 
+      // Dispatch success with current phase for dividers (TRANS-01)
       dispatch({
         type: 'CARD_ACTION_SUCCESS',
         optimisticId,
         botMessages: data.messages,
+        currentPhase: data.workflowState?.currentPhase,
       });
+      if (data.workflowState) {
+        dispatch({ type: 'SET_WORKFLOW_STATE', workflowState: data.workflowState });
+      }
     } catch (err) {
       clearTimeout(skeletonTimer);
       const error = err as Error;
@@ -329,12 +363,22 @@ export function useChatApi({ getToken }: { getToken: () => Promise<string> }) {
     }
   }
 
+  /**
+   * Resets conversation state to initial — clears messages, workflowState, and conversationId.
+   * Use when starting a fresh conversation (STATE-02).
+   */
+  function resetConversation(): void {
+    dispatch({ type: 'RESET_CONVERSATION' });
+  }
+
   return {
     conversationId: state.conversationId,
     messages: state.messages,
     isLoading: state.isLoading,
     error: state.error,
+    workflowState: state.workflowState,
     sendMessage: send,
     cardAction,
+    resetConversation,
   };
 }

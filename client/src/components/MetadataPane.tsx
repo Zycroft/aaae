@@ -1,21 +1,62 @@
-import type { NormalizedMessage } from '@copilot-chat/shared';
+import { useState } from 'react';
+import type { NormalizedMessage, WorkflowState } from '@copilot-chat/shared';
 import './chat.css';
 
 interface MetadataPaneProps {
   messages: NormalizedMessage[];
+  workflowState?: WorkflowState | null;
 }
 
 /**
- * MetadataPane — Activity log sidebar for the chat shell.
+ * Flattens a nested object into dot-notation key-value pairs.
+ * Stops at depth 3 and marks deeper values for JSON display.
  *
- * Filters messages to adaptiveCard kind and renders a numbered timeline.
- * Includes a Download button that exports the full conversation as a dated JSON file.
- *
- * UI-11: Metadata sidebar visible on desktop (≥768px)
- * UI-12: Activity log download button
+ * META-02: Nested objects up to 3 levels deep displayed inline,
+ * deeper structures show "View full data" toggle.
  */
-export function MetadataPane({ messages }: MetadataPaneProps) {
+function flattenData(
+  obj: Record<string, unknown>,
+  prefix = '',
+  depth = 0
+): Array<{ key: string; value: string; needsJsonView: boolean }> {
+  const result: Array<{ key: string; value: string; needsJsonView: boolean }> = [];
+
+  for (const [k, v] of Object.entries(obj)) {
+    const fullKey = prefix ? `${prefix}.${k}` : k;
+
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      if (depth < 2) {
+        // Recurse into nested objects up to 3 levels (depth 0, 1, 2)
+        result.push(...flattenData(v as Record<string, unknown>, fullKey, depth + 1));
+      } else {
+        // Deeper than 3 levels — show as JSON
+        result.push({ key: fullKey, value: JSON.stringify(v, null, 2), needsJsonView: true });
+      }
+    } else {
+      result.push({ key: fullKey, value: String(v ?? ''), needsJsonView: false });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * MetadataPane — Activity log sidebar with workflow data section.
+ *
+ * Shows "Workflow Data" section above Activity Log when workflowState has collectedData.
+ * Workflow data displayed as semantic HTML (dl/dt/dd) with dot-notation for nested objects.
+ *
+ * UI-11: Metadata sidebar visible on desktop (>=768px)
+ * UI-12: Activity log download button
+ * META-01: Workflow Data section with collectedData key-value pairs
+ * META-02: Nested data inline, deep structures show JSON viewer toggle
+ */
+export function MetadataPane({ messages, workflowState }: MetadataPaneProps) {
+  const [showFullData, setShowFullData] = useState<Record<string, boolean>>({});
   const cardActions = messages.filter((m) => m.kind === 'adaptiveCard');
+
+  const collectedData = workflowState?.collectedData;
+  const hasWorkflowData = collectedData && Object.keys(collectedData).length > 0;
 
   function downloadActivityLog() {
     const data = {
@@ -37,6 +78,34 @@ export function MetadataPane({ messages }: MetadataPaneProps) {
 
   return (
     <aside className="metadataPane" aria-label="Activity log">
+      {hasWorkflowData && (
+        <div className="workflowDataSection">
+          <h2 className="metadataPaneTitle">Workflow Data</h2>
+          <dl className="workflowDataList">
+            {flattenData(collectedData).map(({ key, value, needsJsonView }) => (
+              <div key={key} className="workflowDataEntry">
+                <dt className="workflowDataKey">{key}</dt>
+                {needsJsonView ? (
+                  <dd className="workflowDataValue">
+                    <button
+                      type="button"
+                      className="viewFullDataToggle"
+                      onClick={() => setShowFullData((prev) => ({ ...prev, [key]: !prev[key] }))}
+                    >
+                      {showFullData[key] ? 'Hide' : 'View full data'}
+                    </button>
+                    {showFullData[key] && (
+                      <pre className="workflowDataJson">{value}</pre>
+                    )}
+                  </dd>
+                ) : (
+                  <dd className="workflowDataValue">{value}</dd>
+                )}
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
       <div className="metadataPaneHeader">
         <h2 className="metadataPaneTitle">Activity Log</h2>
         <button

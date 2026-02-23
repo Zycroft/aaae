@@ -16,6 +16,8 @@ v1.4 (Persistent State Store) shipped 2026-02-22: Redis-backed conversation pers
 
 v1.5 (Workflow Orchestrator + Structured Output Parsing) shipped 2026-02-22: Structured output parser with multi-strategy extraction and Zod validation (.passthrough() for forward compatibility), configurable context builder with max-length truncation, WorkflowOrchestrator service with Redis state persistence (24h sliding TTL), per-conversation locking (SET NX PX + Lua release), context accumulation across turns, ACTION_TO_STEP workflow progression, route integration for all three chat endpoints, backward compatibility preserved for unstructured responses. 147 tests, 25/25 requirements.
 
+v1.6 (Dynamic Step-Driven UX) shipped 2026-02-22: Client-only milestone making the UI workflow-aware. WorkflowState schema extended with UX fields (progress, suggestedInputType, choices), useChatApi hook tracks workflowState with SET_WORKFLOW_STATE/RESET_CONVERSATION actions, WorkflowProgress bar with determinate/indeterminate modes, phase dividers and orchestrator status messages in transcript, ChatInput dynamic modes (choice pills, confirmation Yes/No, disabled state with free-text fallback), WorkflowComplete view with collected data summary and JSON download, MetadataPane Workflow Data section with dot-notation flattening. Full integration test covering lifecycle with 2 phase transitions and 2 input modes. 173 tests, 30/30 requirements.
+
 ## Core Value
 
 Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
@@ -114,21 +116,30 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ All three chat routes delegate to orchestrator with backward-compatible workflowState field — v1.5
 - ✓ 147 tests passing, 25/25 v1.5 requirements verified — v1.5
 
+- ✓ WorkflowState Zod schema extended with v1.6 UX fields (progress, suggestedInputType, choices) — v1.6 Phase 19
+- ✓ All workflowState fields nullable/optional for backward compatibility — v1.6 Phase 19
+- ✓ useChatApi hook exposes workflowState and resetConversation() — v1.6 Phase 19
+- ✓ chatApi return types include optional workflowState on all three API functions — v1.6 Phase 19
+- ✓ No hardcoded workflow phases in client code — all data flows from server — v1.6 Phase 19
+- ✓ Client without workflowState behaves identically to v1.1 (COMPAT-01) — v1.6 Phase 19
+- ✓ WorkflowProgress component shows phase label + determinate/indeterminate progress bar (PROG-01, PROG-02) — v1.6 Phase 20
+- ✓ WorkflowProgress hides with no layout shift when inactive, animates transitions (PROG-03) — v1.6 Phase 20
+- ✓ ChatShell passes workflowState to child components (SHELL-01) — v1.6 Phase 20
+- ✓ ChatShell shows error state with retry when workflowState.status is 'error' (SHELL-02) — v1.6 Phase 20
+- ✓ Phase dividers in transcript at currentPhase transitions (TRANS-01) — v1.6 Phase 20
+- ✓ Orchestrator status messages as centered muted text (TRANS-02) — v1.6 Phase 20
+- ✓ New components responsive + theme-aware (COMPAT-03) — v1.6 Phase 20
+- ✓ Unit tests for WorkflowProgress component (TEST-01) — v1.6 Phase 20
+- ✓ ChatInput dynamic modes: choice pills, confirmation Yes/No, disabled/none state (INPUT-01 through INPUT-05) — v1.6 Phase 21
+- ✓ WorkflowComplete component with collected data summary, reset button, download button (COMPL-01 through COMPL-03) — v1.6 Phase 21
+- ✓ MetadataPane Workflow Data section with dot-notation flattening and JSON viewer toggle (META-01, META-02) — v1.6 Phase 21
+- ✓ Unit tests for ChatInput modes (TEST-02) and WorkflowComplete (TEST-03) — v1.6 Phase 21
+- ✓ Integration test: full workflow lifecycle simulation with 2 phase transitions, 2 input modes, and reset verification (TEST-04) — v1.6 Phase 22
+- ✓ 30/30 v1.6 requirements verified green — v1.6 Phase 22
+
 ### Active
 
-#### Current Milestone: v1.6 Dynamic Step-Driven UX
-
-**Goal:** Make the client workflow-aware — render server-driven progress, dynamic input modes (choice pills, confirmation buttons), phase dividers, and completion summaries so the AI-driven orchestrator can guide users through multi-step workflows.
-
-**Target features:**
-- Extended message schema with workflowState in API responses
-- Workflow progress indicator (phase label + progress bar)
-- Dynamic input component (text/choice/confirmation/none modes)
-- Workflow completion view with collected data summary
-- Phase dividers and system messages in transcript
-- Workflow data accumulation in MetadataPane
-- Updated useChatApi hook with workflow state management
-- Graceful degradation — no workflow state = pure chat (v1.1 behavior)
+None — v1.6 complete.
 
 ### Out of Scope
 
@@ -144,7 +155,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
-**Current state (v1.6 in progress):** 18 phases, 50 plans shipped across 6 milestones (v1.0–v1.5). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, and workflow orchestration. 147 tests, all passing. Now adding workflow-aware UX to the client.
+**Current state (v1.6 shipped):** 22 phases, 9 plans shipped in v1.6 (Phases 19–22). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, workflow orchestration, and dynamic step-driven UX. 173 tests (147 server + 26 client), all passing. Workflow-aware UI: progress bar, phase dividers, dynamic input modes (choice pills, confirmation buttons, disabled state), workflow completion view with data summary and download, MetadataPane workflow data section, and full integration test coverage. 30/30 v1.6 requirements verified.
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -222,5 +233,18 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | Context builder default maxLength 2000 chars | Conservative estimate for Copilot token budget; configurable for tuning | TBD — needs live validation |
 | String .replace() for preamble placeholders (not regex) | Safe for literal values with special characters (braces, $ signs) | ✓ Good — no injection issues |
 
+| Nullable-optional pattern for v1.6 UX fields | z.number().nullable().optional() for progress (null = indeterminate, undefined = absent) | ✓ Good — clean backward compat, 9 new tests pass |
+| SET_WORKFLOW_STATE dispatched after success actions | Messages update atomically first, then workflow state — prevents UI flicker | ✓ Good — clean ordering |
+| RESET_CONVERSATION uses spread of initialState | Future state additions automatically cleared — no risk of stale fields | ✓ Good — forward-compatible |
+| WorkflowProgress returns null for non-active status | Error state handled by ChatShell separately (SHELL-02) — separation of concerns | ✓ Good — clean responsibility split |
+| Bot messages tagged with currentPhase from API response | Tag at dispatch time using response data, not reducer state (which has previous phase) | ✓ Good — correct phase association |
+| jest.config.cjs (CommonJS) for client workspace | ts-node not installed; .ts config requires ts-node; .cjs works natively | ✓ Good — minimal dependency |
+| renderToStaticMarkup for client unit tests | @testing-library/react not available; renderToStaticMarkup provides pure HTML assertions | ✓ Good — zero additional deps needed |
+| Choice pills above textarea (not inline/below) | Pills visible before user starts typing; natural flow: see options → decide → type or click | ✓ Good — consistent with CONTEXT.md decisions |
+| WorkflowComplete replaces transcript+input (not overlay) | Clean completion state; no stale transcript visible behind overlay | ✓ Good — uses flex layout, no z-index issues |
+| flattenData with dot-notation for nested objects | Intuitive display (address.street) up to 3 levels; deeper gets "View full data" JSON toggle | ✓ Good — handles arbitrary depth gracefully |
+| Confirmation Yes pill uses choicePillPrimary class | Visual hierarchy: primary action (Yes) stands out from neutral (No) | ✓ Good — consistent with existing button patterns |
+| Exported reducer/initialState from useChatApi for integration testing | Avoids MSAL mocking; tests reducer state transitions + component rendering directly | ✓ Good — clean separation, no behavioral change |
+
 ---
-*Last updated: 2026-02-22 after v1.6 milestone start*
+*Last updated: 2026-02-23 after v1.6 milestone*

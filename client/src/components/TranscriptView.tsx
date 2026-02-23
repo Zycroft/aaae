@@ -49,9 +49,25 @@ export function TranscriptView({ messages, isLoading, onCardAction }: Transcript
       aria-label="Conversation transcript"
       aria-relevant="additions"
     >
-      {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} onCardAction={onCardAction} />
-      ))}
+      {messages.map((message, index) => {
+        // Phase divider: show when consecutive messages have different workflowPhase (TRANS-01)
+        const prevPhase = index > 0 ? messages[index - 1].workflowPhase : undefined;
+        const showDivider =
+          message.workflowPhase !== undefined &&
+          prevPhase !== undefined &&
+          prevPhase !== message.workflowPhase;
+
+        return (
+          <div key={message.id}>
+            {showDivider && (
+              <div className="phaseDivider" role="separator" aria-label={`Phase: ${message.workflowPhase}`}>
+                <span className="phaseDividerLabel">{message.workflowPhase}</span>
+              </div>
+            )}
+            <MessageBubble message={message} onCardAction={onCardAction} />
+          </div>
+        );
+      })}
       {isLoading && <SkeletonBubble />}
     </div>
   );

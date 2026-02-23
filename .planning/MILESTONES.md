@@ -120,3 +120,21 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.6 Dynamic Step-Driven UX (Shipped: 2026-02-23)
+
+**Phases completed:** 4 phases (19–22), 9 plans
+**Timeline:** 2026-02-22 (1 day)
+**Files changed:** 17 files, 1,528 insertions, 44 deletions
+**Requirements:** 30/30 complete
+
+**Key accomplishments:**
+1. Extended WorkflowState Zod schema with v1.6 UX fields (progress, suggestedInputType, choices) — nullable-optional pattern for backward compatibility; useChatApi hook exposes workflowState and resetConversation()
+2. WorkflowProgress component with determinate (0–100%) and indeterminate (pulsing) modes, phase dividers in transcript at currentPhase transitions, orchestrator status messages as centered muted text
+3. Dynamic ChatInput modes: choice pills with overflow ("Show more" toggle at >6 items), confirmation Yes/No buttons, disabled state with status message — free-text fallback always available
+4. WorkflowComplete view replacing transcript when status='completed' — collected data summary, "Start new conversation" reset button, "Download summary" JSON export
+5. MetadataPane "Workflow Data" section with dot-notation flattening for nested objects (up to 3 levels) and "View full data" JSON viewer toggle for deeper structures
+6. Full integration test covering multi-step workflow lifecycle: idle → choice mode → phase transition → confirmation mode → completed → reset — 173 tests, 30/30 requirements verified
+
+---
+
