@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
@@ -53,6 +54,16 @@ export function createApp() {
 
   // Orchestrate route — batteries-included endpoint for workflow orchestrator (ORCH-03)
   app.use('/api/chat/orchestrate', orchestrateRouter);
+
+  // Static client serving (Docker production) — opt-in via STATIC_DIR env var
+  if (process.env.STATIC_DIR) {
+    const staticDir = path.resolve(process.env.STATIC_DIR);
+    app.use(express.static(staticDir));
+    // SPA fallback — all non-API, non-file routes serve index.html
+    app.get('*', (_req, res) => {
+      res.sendFile('index.html', { root: staticDir });
+    });
+  }
 
   return app;
 }
