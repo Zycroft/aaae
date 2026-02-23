@@ -11,6 +11,9 @@ COPY shared/package.json shared/
 
 RUN npm ci
 
+# Vite base path for subpath deployments (e.g. /aaae/)
+ARG VITE_BASE_PATH=/aaae/
+
 # Copy source
 COPY shared/ shared/
 COPY client/ client/
@@ -18,6 +21,7 @@ COPY server/ server/
 COPY tsconfig.base.json ./
 
 # Build all workspaces: shared → client → server
+ENV VITE_BASE_PATH=$VITE_BASE_PATH
 RUN npm run build
 
 # ---- Stage 2: Production ----
