@@ -142,11 +142,11 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ OPENAI_API_KEY required only when LLM_PROVIDER=openai, Copilot vars only when LLM_PROVIDER=copilot — v1.7 Phase 23
 - ✓ CopilotProvider wraps CopilotStudioClient behind LlmProvider interface — v1.7 Phase 24
 - ✓ Existing copilot.ts, activityNormalizer.ts, structuredOutputParser.ts byte-for-byte unchanged — v1.7 Phase 24
-<<<<<<< HEAD
-=======
 - ✓ WorkflowOrchestrator depends on LlmProvider interface, zero Copilot SDK imports — v1.7 Phase 25
 - ✓ Copilot path produces identical responses after orchestrator refactor — v1.7 Phase 25
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
+- ✓ OpenAiProvider implements LlmProvider with structured output via json_schema — v1.7 Phase 26
+- ✓ Conversation history accumulates across turns per conversation — v1.7 Phase 26
+- ✓ Card actions converted to text descriptions and processed through sendMessage — v1.7 Phase 26
 
 ### Active
 
@@ -273,14 +273,11 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | COPILOT_ fields use `?? ''` instead of `!` assertion | Validation is now conditional so `!` assertion is unsafe | ✓ Good — no runtime assertion errors |
 | CopilotProvider constructor injection | Accepts CopilotStudioClient via constructor, not module-level import | ✓ Good — enables unit testing with mocks |
 | sendCardAction passes actionValue as activity.value | Direct delegation with empty text string | ✓ Good — consistent with existing card-action route logic |
-<<<<<<< HEAD
-
----
-*Last updated: 2026-02-24 after Phase 24 (CopilotProvider Extraction)*
-=======
 | WorkflowOrchestrator constructor injection of LlmProvider | Dependency inversion — orchestrator knows nothing about specific backends | ✓ Good — enables OpenAI provider swap in Phase 27 |
 | Test helper textMessage() with deterministic IDs | Avoids uuid dependency in tests, padded counter for consistent snapshots | ✓ Good — clean test patterns |
+| OpenAI json_schema response_format for structured output | Guaranteed valid JSON matching CopilotStructuredOutputSchema | ✓ Good — same trust level as Copilot activity.value |
+| Card action → text conversion in OpenAiProvider | Card actions are Copilot-specific; OpenAI processes them as text via sendMessage | ✓ Good — no separate call path needed |
+| Per-conversation history as Map<string, ChatMessage[]> | Server-memory storage, raw JSON content strings for faithful round-tripping | ✓ Good — simple, sufficient for dev/demo |
 
 ---
-*Last updated: 2026-02-24 after Phase 25 (Orchestrator Refactor to LlmProvider)*
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
+*Last updated: 2026-02-24 after Phase 26 (OpenAI Provider Implementation)*

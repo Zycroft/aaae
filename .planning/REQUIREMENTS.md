@@ -11,22 +11,18 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 
 - [x] **PROV-01**: Server defines `LlmProvider` interface with `startSession`, `sendMessage`, `sendCardAction` methods returning `NormalizedMessage[]`
 - [x] **PROV-02**: `CopilotProvider` wraps existing `CopilotStudioClient` behind `LlmProvider` interface
-<<<<<<< HEAD
-- [ ] **PROV-03**: `WorkflowOrchestrator` depends on `LlmProvider` interface, not `CopilotStudioClient` directly
-=======
 - [x] **PROV-03**: `WorkflowOrchestrator` depends on `LlmProvider` interface, not `CopilotStudioClient` directly
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
 - [ ] **PROV-04**: Provider factory selects backend based on `LLM_PROVIDER` config value
 - [ ] **PROV-05**: Provider factory lazy-loads only the selected backend's SDK
 
 ### OpenAI Backend
 
-- [ ] **OAPI-01**: `OpenAiProvider` implements `LlmProvider` using OpenAI chat completions API
-- [ ] **OAPI-02**: OpenAI provider uses structured output (`response_format: json_schema`) matching `extractedPayload` contract
-- [ ] **OAPI-03**: System prompt injects workflow state (step, collectedData, turnCount) per-call
-- [ ] **OAPI-04**: Conversation history accumulates across turns per conversation
-- [ ] **OAPI-05**: Card actions converted to text descriptions and processed through `sendMessage` logic
-- [ ] **OAPI-06**: OpenAI model configurable via `OPENAI_MODEL` env var (default: `gpt-4o-mini`)
+- [x] **OAPI-01**: `OpenAiProvider` implements `LlmProvider` using OpenAI chat completions API
+- [x] **OAPI-02**: OpenAI provider uses structured output (`response_format: json_schema`) matching `extractedPayload` contract
+- [x] **OAPI-03**: System prompt injects workflow state (step, collectedData, turnCount) per-call
+- [x] **OAPI-04**: Conversation history accumulates across turns per conversation
+- [x] **OAPI-05**: Card actions converted to text descriptions and processed through `sendMessage` logic
+- [x] **OAPI-06**: OpenAI model configurable via `OPENAI_MODEL` env var (default: `gpt-4o-mini`)
 
 ### Configuration
 
@@ -84,19 +80,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-03 | Phase 23 | Complete |
 | PROV-02 | Phase 24 | Complete |
 | COMPAT-03 | Phase 24 | Complete |
-<<<<<<< HEAD
-| PROV-03 | Phase 25 | Pending |
-| COMPAT-01 | Phase 25 | Pending |
-=======
 | PROV-03 | Phase 25 | Complete |
 | COMPAT-01 | Phase 25 | Complete |
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
-| OAPI-01 | Phase 26 | Pending |
-| OAPI-02 | Phase 26 | Pending |
-| OAPI-03 | Phase 26 | Pending |
-| OAPI-04 | Phase 26 | Pending |
-| OAPI-05 | Phase 26 | Pending |
-| OAPI-06 | Phase 26 | Pending |
+| OAPI-01 | Phase 26 | Complete |
+| OAPI-02 | Phase 26 | Complete |
+| OAPI-03 | Phase 26 | Complete |
+| OAPI-04 | Phase 26 | Complete |
+| OAPI-05 | Phase 26 | Complete |
+| OAPI-06 | Phase 26 | Complete |
 | PROV-04 | Phase 27 | Pending |
 | PROV-05 | Phase 27 | Pending |
 | CONF-04 | Phase 27 | Pending |

@@ -5,29 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-<<<<<<< HEAD
-**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 25: Orchestrator Refactor to LlmProvider
+**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 27: Provider Factory + Auth Polish
 
 ## Current Position
 
-Phase: 25 — Orchestrator Refactor to LlmProvider
+Phase: 27 — Provider Factory + Auth Polish
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-02-24 — Phase 24 complete (CopilotProvider extraction behind LlmProvider)
+Last activity: 2026-02-24 — Phase 26 complete (OpenAiProvider implemented with structured output)
 
-Progress: ██░░░░░░░░ 2/6 phases (v1.7)
-=======
-**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 26: OpenAI Provider Implementation
-
-## Current Position
-
-Phase: 26 — OpenAI Provider Implementation
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-24 — Phase 25 complete (Orchestrator refactored to LlmProvider)
-
-Progress: ███░░░░░░░ 3/6 phases (v1.7)
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
+Progress: ████░░░░░░ 4/6 phases (v1.7)
 
 ## Performance Metrics
 
@@ -52,14 +39,17 @@ Progress: ███░░░░░░░ 3/6 phases (v1.7)
 
 All decisions logged in PROJECT.md Key Decisions table.
 
-<<<<<<< HEAD
-=======
+**26-01 Decisions:**
+- System prompt as static workflow instructions, contextBuilder preamble provides per-turn state — separation of concerns between system prompt and user message enrichment
+- extractedPayload uses source:'value' confidence:'high' for json_schema responses — analogous to Copilot SDK activity.value surface
+- sendCardAction converts to text and delegates to sendMessage — simplest approach since card actions are Copilot-specific
+- Conversation history stores raw JSON content strings — faithful round-tripping to OpenAI
+
 **25-01 Decisions:**
 - processCardAction passes { ...submitData, cardId } to sendCardAction — userSummary not forwarded since CopilotProvider uses empty text for card actions
 - Test helper textMessage() uses deterministic padded-counter IDs — avoids uuid dependency in tests
 - greetingMessages stored as sdkConversationRef in conversation store — NormalizedMessage[] compatible with unknown[] store type
 
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
 **24-01 Decisions:**
 - CopilotProvider uses constructor injection for CopilotStudioClient — enables unit testing with mocks
 - conversationId parameter unused by Copilot SDK (manages its own state) — prefixed with _
@@ -92,9 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-24
-<<<<<<< HEAD
-Stopped at: Phase 24 complete, ready to plan Phase 25
-=======
-Stopped at: Phase 25 complete, ready to plan Phase 26
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
+Stopped at: Phase 26 execution complete, awaiting verification
 Resume file: None

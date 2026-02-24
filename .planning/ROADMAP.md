@@ -95,13 +95,9 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
 
 - [x] **Phase 23: LLM Provider Interface + Config** - Define provider contract and make config provider-aware (completed 2026-02-24)
 - [x] **Phase 24: CopilotProvider Extraction** - Wrap existing Copilot logic behind LlmProvider interface (completed 2026-02-24)
-<<<<<<< HEAD
-- [ ] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only
-=======
 - [x] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only (completed 2026-02-24)
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
-- [ ] **Phase 26: OpenAI Provider Implementation** - Create working OpenAI-backed LlmProvider
-- [ ] **Phase 27: Provider Factory + Auth Polish** - Wire config-driven backend selection and health reporting
+- [x] **Phase 26: OpenAI Provider Implementation** - Create working OpenAI-backed LlmProvider (completed 2026-02-24)
+- [ ] **Phase 27: Provider Factory + Auth Polish** - Wire config-driven backend selection and health reporting (1 plan)
 - [ ] **Phase 28: Testing + Verification** - Full test coverage for both providers and the factory
 
 ## Phase Details
@@ -172,7 +168,10 @@ Plans:
   3. `GET /health` response includes `provider` and `model` fields showing the active backend
   4. `shared/` and `client/` directories have zero modified files
   5. The factory imports only the selected provider's SDK at runtime (Copilot SDK not loaded when `LLM_PROVIDER=openai`)
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 27-01-PLAN.md — Provider factory with dynamic imports + health endpoint enhancement
 
 ### Phase 28: Testing + Verification
 **Goal**: Both providers are covered by unit tests, the orchestrator integration test uses a mocked `LlmProvider`, and config validation is verified to fail loudly on bad inputs.
@@ -214,11 +213,7 @@ Plans:
 | 22. Integration Testing | v1.6 | 1/1 | Complete | 2026-02-23 |
 | 23. LLM Provider Interface + Config | v1.7 | 1/1 | Complete | 2026-02-24 |
 | 24. CopilotProvider Extraction | 1/1 | Complete    | 2026-02-24 | - |
-<<<<<<< HEAD
-| 25. Orchestrator Refactor to LlmProvider | v1.7 | 0/? | Not started | - |
-=======
 | 25. Orchestrator Refactor to LlmProvider | 1/1 | Complete    | 2026-02-24 | - |
->>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
-| 26. OpenAI Provider Implementation | v1.7 | 0/? | Not started | - |
+| 26. OpenAI Provider Implementation | 1/1 | Complete    | 2026-02-24 | - |
 | 27. Provider Factory + Auth Polish | v1.7 | 0/? | Not started | - |
 | 28. Testing + Verification | v1.7 | 0/? | Not started | - |
