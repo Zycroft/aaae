@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.7 OpenAI Dev/Demo Backend
+**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 23: LLM Provider Interface + Config
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 23 — LLM Provider Interface + Config
 Plan: —
-Status: Defining requirements
-Last activity: 2026-02-23 — Milestone v1.7 started
+Status: Roadmap created, ready to plan Phase 23
+Last activity: 2026-02-23 — v1.7 roadmap created (Phases 23–28)
+
+Progress: ░░░░░░░░░░ 0/6 phases (v1.7)
 
 ## Performance Metrics
 
@@ -37,6 +39,14 @@ Last activity: 2026-02-23 — Milestone v1.7 started
 
 All decisions logged in PROJECT.md Key Decisions table.
 
+### v1.7 Key Architecture Decisions
+
+- `LlmProvider` interface owns all normalization internally — orchestrator receives `NormalizedMessage[]` only
+- `CopilotStudioClient` singleton in `copilot.ts` stays unchanged — `CopilotProvider` wraps it
+- OpenAI provider maintains per-conversation history in a `Map<string, ChatMessage[]>` (server memory)
+- Provider factory uses dynamic imports for lazy-loading (avoids loading unused SDK at startup)
+- `shared/` and `client/` require zero changes — provider abstraction is entirely server-side
+
 ### Pending Todos
 
 None.
@@ -50,6 +60,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Milestone v1.7 requirements definition
-Resume file: .planning/REQUIREMENTS.md
-Next step: Define requirements → create roadmap
+Stopped at: v1.7 roadmap creation complete
+Resume file: .planning/ROADMAP.md
+Next step: `/gsd:plan-phase 23` — plan Phase 23: LLM Provider Interface + Config
