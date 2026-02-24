@@ -139,7 +139,18 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ### Active
 
-None — v1.6 complete.
+## Current Milestone: v1.7 OpenAI Dev/Demo Backend
+
+**Goal:** Add OpenAI as an alternative LLM backend so the app runs without Copilot Studio credentials — for dev onboarding, demos, and testing.
+
+**Target features:**
+- LlmProvider interface abstracting Copilot and OpenAI backends
+- CopilotProvider extraction (pure refactor, zero behavioral change)
+- Orchestrator refactored to depend on LlmProvider, not CopilotStudioClient
+- OpenAI provider with chat completions + structured output
+- Provider factory with config-driven lazy loading
+- Conditional config validation (each provider requires only its own env vars)
+- 3-env-var minimal dev setup (LLM_PROVIDER=openai, OPENAI_API_KEY, AUTH_REQUIRED=false)
 
 ### Out of Scope
 
@@ -247,4 +258,4 @@ None — v1.6 complete.
 | Exported reducer/initialState from useChatApi for integration testing | Avoids MSAL mocking; tests reducer state transitions + component rendering directly | ✓ Good — clean separation, no behavioral change |
 
 ---
-*Last updated: 2026-02-23 after v1.6 milestone*
+*Last updated: 2026-02-23 after v1.7 milestone started*

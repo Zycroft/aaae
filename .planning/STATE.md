@@ -5,15 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-23)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** Planning next milestone
+**Current focus:** v1.7 OpenAI Dev/Demo Backend
 
 ## Current Position
 
-Phase: 22 of 22 — all phases complete
-Status: Milestone v1.6 shipped
-Last activity: 2026-02-23 — v1.6 Dynamic Step-Driven UX milestone archived
-
-Progress: [████████████████████] 7/7 milestones shipped (v1.0–v1.6)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-23 — Milestone v1.7 started
 
 ## Performance Metrics
 
@@ -51,6 +50,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: v1.6 milestone archived
-Resume file: .planning/MILESTONES.md
-Next step: /gsd:new-milestone
+Stopped at: Milestone v1.7 requirements definition
+Resume file: .planning/REQUIREMENTS.md
+Next step: Define requirements → create roadmap
