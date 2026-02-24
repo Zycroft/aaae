@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
 import { getRedisClient } from './store/index.js';
+import { getProviderInfo } from './provider/providerFactory.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgAllowlist } from './middleware/orgAllowlist.js';
 import { chatRouter } from './routes/chat.js';
@@ -35,8 +36,12 @@ export function createApp() {
       redisStatus = redisClient.status === 'ready' ? 'connected' : 'disconnected';
     }
 
+    const providerInfo = getProviderInfo();
+
     res.json({
       status: 'ok',
+      provider: providerInfo.provider,
+      model: providerInfo.model,
       authRequired: config.AUTH_REQUIRED,
       redis: redisStatus,
     });

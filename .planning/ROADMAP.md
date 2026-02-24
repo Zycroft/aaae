@@ -97,8 +97,8 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
 - [x] **Phase 24: CopilotProvider Extraction** - Wrap existing Copilot logic behind LlmProvider interface (completed 2026-02-24)
 - [x] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only (completed 2026-02-24)
 - [x] **Phase 26: OpenAI Provider Implementation** - Create working OpenAI-backed LlmProvider (completed 2026-02-24)
-- [ ] **Phase 27: Provider Factory + Auth Polish** - Wire config-driven backend selection and health reporting (1 plan)
-- [ ] **Phase 28: Testing + Verification** - Full test coverage for both providers and the factory
+- [x] **Phase 27: Provider Factory + Auth Polish** - Wire config-driven backend selection and health reporting (1 plan) (completed 2026-02-24)
+- [ ] **Phase 28: Testing + Verification** - Full test coverage for both providers and the factory (2 plans)
 
 ## Phase Details
 
@@ -183,7 +183,11 @@ Plans:
   3. Orchestrator integration test drives a multi-turn workflow to completion using a mocked `LlmProvider`
   4. Config validation tests assert the correct fatal error for each bad-config scenario (wrong provider, missing key)
   5. Manual smoke test confirms: UI works with `LLM_PROVIDER=openai`, health endpoint shows `"provider": "openai"`, switching back to `LLM_PROVIDER=copilot` restores prior behavior
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 28-01-PLAN.md — Provider factory + config validation tests (TEST-03, TEST-05)
+- [ ] 28-02-PLAN.md — Audit/extend provider + integration tests (TEST-01, TEST-02, TEST-04)
 
 ## Progress
 
@@ -215,5 +219,5 @@ Plans:
 | 24. CopilotProvider Extraction | 1/1 | Complete    | 2026-02-24 | - |
 | 25. Orchestrator Refactor to LlmProvider | 1/1 | Complete    | 2026-02-24 | - |
 | 26. OpenAI Provider Implementation | 1/1 | Complete    | 2026-02-24 | - |
-| 27. Provider Factory + Auth Polish | v1.7 | 0/? | Not started | - |
-| 28. Testing + Verification | v1.7 | 0/? | Not started | - |
+| 27. Provider Factory + Auth Polish | 1/1 | Complete    | 2026-02-24 | - |
+| 28. Testing + Verification | v1.7 | 0/2 | Not started | - |

@@ -12,8 +12,8 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 - [x] **PROV-01**: Server defines `LlmProvider` interface with `startSession`, `sendMessage`, `sendCardAction` methods returning `NormalizedMessage[]`
 - [x] **PROV-02**: `CopilotProvider` wraps existing `CopilotStudioClient` behind `LlmProvider` interface
 - [x] **PROV-03**: `WorkflowOrchestrator` depends on `LlmProvider` interface, not `CopilotStudioClient` directly
-- [ ] **PROV-04**: Provider factory selects backend based on `LLM_PROVIDER` config value
-- [ ] **PROV-05**: Provider factory lazy-loads only the selected backend's SDK
+- [x] **PROV-04**: Provider factory selects backend based on `LLM_PROVIDER` config value
+- [x] **PROV-05**: Provider factory lazy-loads only the selected backend's SDK
 
 ### OpenAI Backend
 
@@ -29,13 +29,13 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 - [x] **CONF-01**: `LLM_PROVIDER` env var selects backend (`copilot` default, `openai` alternative)
 - [x] **CONF-02**: `COPILOT_*` env vars required only when `LLM_PROVIDER=copilot`
 - [x] **CONF-03**: `OPENAI_API_KEY` required only when `LLM_PROVIDER=openai`
-- [ ] **CONF-04**: Server starts with `LLM_PROVIDER=openai` + `OPENAI_API_KEY` + `AUTH_REQUIRED=false` (3 env vars)
-- [ ] **CONF-05**: Health endpoint reports active provider name and model
+- [x] **CONF-04**: Server starts with `LLM_PROVIDER=openai` + `OPENAI_API_KEY` + `AUTH_REQUIRED=false` (3 env vars)
+- [x] **CONF-05**: Health endpoint reports active provider name and model
 
 ### Compatibility
 
 - [x] **COMPAT-01**: `LLM_PROVIDER=copilot` behavior identical to pre-refactor (zero regression)
-- [ ] **COMPAT-02**: `shared/` and `client/` require no changes
+- [x] **COMPAT-02**: `shared/` and `client/` require no changes
 - [x] **COMPAT-03**: Existing `copilot.ts`, `activityNormalizer.ts`, `structuredOutputParser.ts` unchanged
 
 ### Testing
@@ -88,11 +88,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OAPI-04 | Phase 26 | Complete |
 | OAPI-05 | Phase 26 | Complete |
 | OAPI-06 | Phase 26 | Complete |
-| PROV-04 | Phase 27 | Pending |
-| PROV-05 | Phase 27 | Pending |
-| CONF-04 | Phase 27 | Pending |
-| CONF-05 | Phase 27 | Pending |
-| COMPAT-02 | Phase 27 | Pending |
+| PROV-04 | Phase 27 | Complete |
+| PROV-05 | Phase 27 | Complete |
+| CONF-04 | Phase 27 | Complete |
+| CONF-05 | Phase 27 | Complete |
+| COMPAT-02 | Phase 27 | Complete |
 | TEST-01 | Phase 28 | Pending |
 | TEST-02 | Phase 28 | Pending |
 | TEST-03 | Phase 28 | Pending |

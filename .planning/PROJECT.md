@@ -147,6 +147,10 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ OpenAiProvider implements LlmProvider with structured output via json_schema — v1.7 Phase 26
 - ✓ Conversation history accumulates across turns per conversation — v1.7 Phase 26
 - ✓ Card actions converted to text descriptions and processed through sendMessage — v1.7 Phase 26
+- ✓ Provider factory selects backend via LLM_PROVIDER with dynamic import lazy-loading — v1.7 Phase 27
+- ✓ Health endpoint reports active provider name and model — v1.7 Phase 27
+- ✓ 3-env-var minimal dev setup (LLM_PROVIDER=openai + OPENAI_API_KEY + AUTH_REQUIRED=false) — v1.7 Phase 27
+- ✓ shared/ and client/ have zero changes throughout v1.7 provider abstraction — v1.7 Phase 27
 
 ### Active
 
@@ -278,6 +282,9 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | OpenAI json_schema response_format for structured output | Guaranteed valid JSON matching CopilotStructuredOutputSchema | ✓ Good — same trust level as Copilot activity.value |
 | Card action → text conversion in OpenAiProvider | Card actions are Copilot-specific; OpenAI processes them as text via sendMessage | ✓ Good — no separate call path needed |
 | Per-conversation history as Map<string, ChatMessage[]> | Server-memory storage, raw JSON content strings for faithful round-tripping | ✓ Good — simple, sufficient for dev/demo |
+| Provider factory dynamic import() for both paths | No top-level SDK imports at module scope — only selected provider's SDK loaded | ✓ Good — clean lazy-loading |
+| getOrchestrator() throws if called before init | Fail-fast prevents silent null reference during startup race | ✓ Good — explicit error |
+| Health endpoint getProviderInfo() is synchronous | Reads config, not SDK state — no async needed for health checks | ✓ Good — fast health checks |
 
 ---
-*Last updated: 2026-02-24 after Phase 26 (OpenAI Provider Implementation)*
+*Last updated: 2026-02-24 after Phase 27 (Provider Factory + Auth Polish)*

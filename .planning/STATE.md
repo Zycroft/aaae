@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 27: Provider Factory + Auth Polish
+**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 28: Testing + Verification
 
 ## Current Position
 
-Phase: 27 — Provider Factory + Auth Polish
+Phase: 28 — Testing + Verification
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-02-24 — Phase 26 complete (OpenAiProvider implemented with structured output)
+Last activity: 2026-02-24 — Phase 27 complete (Provider factory with dynamic imports, health endpoint reporting)
 
-Progress: ████░░░░░░ 4/6 phases (v1.7)
+Progress: █████░░░░░ 5/6 phases (v1.7)
 
 ## Performance Metrics
 
@@ -38,6 +38,12 @@ Progress: ████░░░░░░ 4/6 phases (v1.7)
 ### Decisions
 
 All decisions logged in PROJECT.md Key Decisions table.
+
+**27-01 Decisions:**
+- Provider factory uses dynamic import() for both paths — no top-level SDK imports at module scope
+- getOrchestrator() throws if called before init — fail-fast prevents silent null reference
+- Health endpoint getProviderInfo() is synchronous (reads config, not SDK) — no async needed for health checks
+- routes/orchestrate.ts left as-is (legacy Copilot-only endpoint) — Phase 28 addresses test coverage
 
 **26-01 Decisions:**
 - System prompt as static workflow instructions, contextBuilder preamble provides per-turn state — separation of concerns between system prompt and user message enrichment
@@ -82,5 +88,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Phase 26 execution complete, awaiting verification
+Stopped at: Phase 27 execution complete, awaiting verification
 Resume file: None

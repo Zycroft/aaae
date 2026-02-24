@@ -6,7 +6,7 @@ import {
 } from '@copilot-chat/shared';
 import { validateCardAction } from '../allowlist/cardActionAllowlist.js';
 import { isRedisError } from '../utils/errorDetection.js';
-import { orchestrator } from '../orchestrator/index.js';
+import { getOrchestrator } from '../orchestrator/index.js';
 
 export const chatRouter = Router();
 
@@ -22,6 +22,7 @@ export const chatRouter = Router();
  */
 chatRouter.post('/start', async (req, res) => {
   try {
+    const orchestrator = getOrchestrator();
     const conversationId = uuidv4();
     const workflowState = await orchestrator.startSession({
       conversationId,
@@ -59,6 +60,7 @@ chatRouter.post('/send', async (req, res) => {
   const { conversationId, text } = parsed.data;
 
   try {
+    const orchestrator = getOrchestrator();
     const workflowResponse = await orchestrator.processTurn({
       conversationId,
       text,
@@ -109,6 +111,7 @@ chatRouter.post('/card-action', async (req, res) => {
   }
 
   try {
+    const orchestrator = getOrchestrator();
     const workflowResponse = await orchestrator.processCardAction({
       conversationId,
       cardId,
