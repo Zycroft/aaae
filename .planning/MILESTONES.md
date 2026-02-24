@@ -138,3 +138,25 @@ Proceeding with known documentation gaps (functional code is complete, all E2E f
 
 ---
 
+
+## v1.7 OpenAI Dev/Demo Backend (Shipped: 2026-02-24)
+
+**Phases completed:** 6 phases (23–28), 7 plans
+**Timeline:** 2026-02-23 → 2026-02-24 (1 day)
+**Git range:** ba46b4b → ef66a55
+**Files changed:** 47 files, 4,412 insertions, 323 deletions
+**Requirements:** 21/21 complete
+**Tests:** 207 total (181 server + 26 client)
+
+**Key accomplishments:**
+1. LlmProvider TypeScript interface with conditional env var validation — `LLM_PROVIDER` config switches between copilot and openai backends with fail-loud validation per provider
+2. CopilotProvider adapter wrapping existing CopilotStudioClient behind LlmProvider interface with constructor injection — existing Copilot files byte-for-byte unchanged
+3. WorkflowOrchestrator refactored to accept LlmProvider interface — zero Copilot SDK imports, all pre-existing tests pass
+4. OpenAiProvider implementing LlmProvider via OpenAI chat completions API with structured output (json_schema), per-conversation history, and card action text conversion
+5. Config-driven provider factory with dynamic imports for lazy SDK loading — only selected provider's SDK loaded at runtime; health endpoint reports active provider and model
+6. 34 new tests: provider factory (7), config validation (8), OpenAiProvider (15), CopilotProvider (4) — 207 total tests, all green
+
+**Delivered:** OpenAI as alternative LLM backend — 3-env-var minimal dev setup (`LLM_PROVIDER=openai` + `OPENAI_API_KEY` + `AUTH_REQUIRED=false`) enables the app to run without Copilot Studio credentials for dev onboarding, demos, and testing.
+
+---
+

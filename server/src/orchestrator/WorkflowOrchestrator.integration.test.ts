@@ -10,13 +10,14 @@ import { DEFAULT_WORKFLOW_DEFINITION } from '../workflow/workflowDefinition.js';
 /**
  * Integration test for WorkflowOrchestrator multi-turn data accumulation.
  *
- * Demonstrates TEST-03: collectedData accumulates across 3+ sequential
- * processTurn calls and appears in successive query preambles.
+ * Demonstrates multi-turn workflow through orchestrator with mocked LlmProvider:
+ * - TEST-03 (v1.5): collectedData accumulates across 3+ sequential processTurn calls
+ * - TEST-04 (v1.7): multi-turn conversation drives workflow to completion
  *
  * Uses fully mocked dependencies (no real Redis, no real LLM calls).
  * Mock stores use real Map operations for state persistence across calls.
  *
- * TEST-03
+ * TEST-03 (v1.5), TEST-04 (v1.7)
  */
 
 // ── Mock helpers ──
@@ -220,6 +221,9 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
       age: 30,
       location: 'Seattle',
     });
+
+    // Workflow driven to completion (TEST-04): step should be 'complete'
+    expect(turn3Result.workflowState.step).toBe('complete');
 
     // Query sent on turn 3 should include context preamble with turns 1+2 data
     const turn3Query = mockLlmProvider.sendMessage.mock.calls[2][1] as string;

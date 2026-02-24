@@ -245,6 +245,48 @@ describe('OpenAiProvider', () => {
     });
   });
 
+  describe('edge cases', () => {
+    it('returns empty array when OpenAI returns no content in startSession', async () => {
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: null, role: 'assistant' }, finish_reason: 'stop' }],
+      });
+
+      const result = await provider.startSession('conv-empty');
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when OpenAI returns no content in sendMessage', async () => {
+      mockCreate.mockResolvedValueOnce(mockCompletion(GREETING_RESPONSE));
+      await provider.startSession('conv-1');
+
+      mockCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: null, role: 'assistant' }, finish_reason: 'stop' }],
+      });
+
+      const result = await provider.sendMessage('conv-1', 'Hello');
+
+      expect(result).toEqual([]);
+    });
+
+    it('sendMessage auto-creates history for unknown conversationId', async () => {
+      // Call sendMessage without startSession first
+      mockCreate.mockResolvedValueOnce(mockCompletion(STANDARD_RESPONSE));
+
+      const result = await provider.sendMessage('conv-unknown', 'Hello');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].text).toBe(STANDARD_RESPONSE.prompt);
+
+      // Verify system prompt + user message were sent
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.messages[0].role).toBe('system');
+      const userMsgs = callArgs.messages.filter((m: { role: string }) => m.role === 'user');
+      expect(userMsgs).toHaveLength(1);
+      expect(userMsgs[0].content).toBe('Hello');
+    });
+  });
+
   describe('extractedPayload schema compatibility', () => {
     it('extractedPayload.data passes CopilotStructuredOutputSchema.safeParse()', async () => {
       mockCreate.mockResolvedValueOnce(mockCompletion(GREETING_RESPONSE));

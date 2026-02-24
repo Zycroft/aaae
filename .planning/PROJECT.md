@@ -18,6 +18,8 @@ v1.5 (Workflow Orchestrator + Structured Output Parsing) shipped 2026-02-22: Str
 
 v1.6 (Dynamic Step-Driven UX) shipped 2026-02-22: Client-only milestone making the UI workflow-aware. WorkflowState schema extended with UX fields (progress, suggestedInputType, choices), useChatApi hook tracks workflowState with SET_WORKFLOW_STATE/RESET_CONVERSATION actions, WorkflowProgress bar with determinate/indeterminate modes, phase dividers and orchestrator status messages in transcript, ChatInput dynamic modes (choice pills, confirmation Yes/No, disabled state with free-text fallback), WorkflowComplete view with collected data summary and JSON download, MetadataPane Workflow Data section with dot-notation flattening. Full integration test covering lifecycle with 2 phase transitions and 2 input modes. 173 tests, 30/30 requirements.
 
+v1.7 (OpenAI Dev/Demo Backend) shipped 2026-02-24: LlmProvider interface abstracting Copilot and OpenAI backends, CopilotProvider extraction (zero behavioral change), orchestrator refactored to depend on interface only, OpenAiProvider with chat completions + structured output (json_schema) + per-conversation history, provider factory with dynamic imports for lazy SDK loading, conditional config validation per provider. 3-env-var minimal dev setup (LLM_PROVIDER=openai + OPENAI_API_KEY + AUTH_REQUIRED=false). shared/ and client/ unchanged. 207 tests, 21/21 requirements.
+
 ## Core Value
 
 Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
@@ -136,36 +138,17 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ Unit tests for ChatInput modes (TEST-02) and WorkflowComplete (TEST-03) — v1.6 Phase 21
 - ✓ Integration test: full workflow lifecycle simulation with 2 phase transitions, 2 input modes, and reset verification (TEST-04) — v1.6 Phase 22
 - ✓ 30/30 v1.6 requirements verified green — v1.6 Phase 22
-
-- ✓ LlmProvider interface with startSession/sendMessage/sendCardAction returning NormalizedMessage[] — v1.7 Phase 23
-- ✓ LLM_PROVIDER env var with conditional provider validation (Copilot or OpenAI) — v1.7 Phase 23
-- ✓ OPENAI_API_KEY required only when LLM_PROVIDER=openai, Copilot vars only when LLM_PROVIDER=copilot — v1.7 Phase 23
-- ✓ CopilotProvider wraps CopilotStudioClient behind LlmProvider interface — v1.7 Phase 24
-- ✓ Existing copilot.ts, activityNormalizer.ts, structuredOutputParser.ts byte-for-byte unchanged — v1.7 Phase 24
-- ✓ WorkflowOrchestrator depends on LlmProvider interface, zero Copilot SDK imports — v1.7 Phase 25
-- ✓ Copilot path produces identical responses after orchestrator refactor — v1.7 Phase 25
-- ✓ OpenAiProvider implements LlmProvider with structured output via json_schema — v1.7 Phase 26
-- ✓ Conversation history accumulates across turns per conversation — v1.7 Phase 26
-- ✓ Card actions converted to text descriptions and processed through sendMessage — v1.7 Phase 26
-- ✓ Provider factory selects backend via LLM_PROVIDER with dynamic import lazy-loading — v1.7 Phase 27
-- ✓ Health endpoint reports active provider name and model — v1.7 Phase 27
-- ✓ 3-env-var minimal dev setup (LLM_PROVIDER=openai + OPENAI_API_KEY + AUTH_REQUIRED=false) — v1.7 Phase 27
-- ✓ shared/ and client/ have zero changes throughout v1.7 provider abstraction — v1.7 Phase 27
+- ✓ LlmProvider interface with conditional env var validation for copilot/openai switching — v1.7
+- ✓ CopilotProvider wrapping CopilotStudioClient behind LlmProvider interface — v1.7
+- ✓ WorkflowOrchestrator refactored to LlmProvider interface, zero Copilot SDK imports — v1.7
+- ✓ OpenAiProvider with structured output (json_schema), per-conversation history, card action text conversion — v1.7
+- ✓ Provider factory with dynamic imports for lazy SDK loading, health endpoint provider reporting — v1.7
+- ✓ 3-env-var minimal dev setup (LLM_PROVIDER=openai + OPENAI_API_KEY + AUTH_REQUIRED=false) — v1.7
+- ✓ 207 total tests (181 server + 26 client), 21/21 v1.7 requirements — v1.7
 
 ### Active
 
-## Current Milestone: v1.7 OpenAI Dev/Demo Backend
-
-**Goal:** Add OpenAI as an alternative LLM backend so the app runs without Copilot Studio credentials — for dev onboarding, demos, and testing.
-
-**Target features:**
-- LlmProvider interface abstracting Copilot and OpenAI backends
-- CopilotProvider extraction (pure refactor, zero behavioral change)
-- Orchestrator refactored to depend on LlmProvider, not CopilotStudioClient
-- OpenAI provider with chat completions + structured output
-- Provider factory with config-driven lazy loading
-- Conditional config validation (each provider requires only its own env vars)
-- 3-env-var minimal dev setup (LLM_PROVIDER=openai, OPENAI_API_KEY, AUTH_REQUIRED=false)
+(Next milestone not yet defined — run `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -181,7 +164,7 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 
 ## Context
 
-**Current state (v1.6 shipped):** 22 phases, 9 plans shipped in v1.6 (Phases 19–22). Full-stack monorepo with authenticated chat UI, Copilot Studio proxy, Adaptive Cards, Redis persistence, workflow orchestration, and dynamic step-driven UX. 173 tests (147 server + 26 client), all passing. Workflow-aware UI: progress bar, phase dividers, dynamic input modes (choice pills, confirmation buttons, disabled state), workflow completion view with data summary and download, MetadataPane workflow data section, and full integration test coverage. 30/30 v1.6 requirements verified.
+**Current state (v1.7 shipped):** 28 phases across 8 milestones. Full-stack monorepo with authenticated chat UI, dual LLM backend (Copilot Studio + OpenAI), Adaptive Cards, Redis persistence, workflow orchestration, and dynamic step-driven UX. 207 tests (181 server + 26 client), all passing. Provider abstraction: LlmProvider interface, CopilotProvider and OpenAiProvider implementations, config-driven factory with dynamic imports, health endpoint reporting active provider. 3-env-var dev setup for OpenAI mode. 21/21 v1.7 requirements verified.
 
 **Tech stack:**
 - Monorepo: npm workspaces (`client/`, `server/`, `shared/`)
@@ -195,6 +178,8 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - Missing VERIFICATION.md for Phases 1 & 3 (all code verified functionally; documentation gap only)
 - ESLint JSX plugin missing — non-blocking, 3 pre-existing errors in AdaptiveCardMessage.tsx and ChatInput.tsx
 - Context builder maxLength 2000 chars default — needs live validation with real Copilot workloads
+- OpenAI per-conversation history in server memory (Map) — not persisted to Redis, suitable for dev/demo only
+- routes/orchestrate.ts is legacy Copilot-only endpoint — not provider-aware
 
 ## Constraints
 
@@ -287,4 +272,4 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | Health endpoint getProviderInfo() is synchronous | Reads config, not SDK state — no async needed for health checks | ✓ Good — fast health checks |
 
 ---
-*Last updated: 2026-02-24 after Phase 27 (Provider Factory + Auth Polish)*
+*Last updated: 2026-02-24 after v1.7 milestone archived*
