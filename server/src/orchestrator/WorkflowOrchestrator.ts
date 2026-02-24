@@ -1,12 +1,9 @@
-import type { Activity } from '@microsoft/agents-activity';
-import { ActivityTypes } from '@microsoft/agents-activity';
 import type { WorkflowState, NormalizedMessage } from '@copilot-chat/shared';
-import type { CopilotStudioClient } from '@microsoft/agents-copilotstudio-client';
 
+import type { LlmProvider } from '../provider/LlmProvider.js';
 import type { WorkflowStateStore } from '../store/WorkflowStateStore.js';
 import type { ConversationStore } from '../store/ConversationStore.js';
 import type { ConversationLock } from '../lock/ConversationLock.js';
-import { normalizeActivities } from '../normalizer/activityNormalizer.js';
 import { parseTurn } from '../parser/structuredOutputParser.js';
 import { buildContextualQuery } from '../workflow/contextBuilder.js';
 import {
@@ -26,7 +23,7 @@ import type {
 /**
  * Map nextAction values from ParsedTurn to workflow definition step IDs.
  *
- * When the Copilot structured output contains an `action` field, this maps it
+ * When the structured output contains an `action` field, this maps it
  * to the corresponding step in the workflow definition. Null (passthrough)
  * keeps the current step unchanged.
  */
@@ -45,22 +42,22 @@ const ACTION_TO_STEP: Record<string, string> = {
  * 1. Acquire per-conversation lock
  * 2. Load workflow state from store
  * 3. Enrich outbound query with accumulated context
- * 4. Call Copilot Studio
- * 5. Normalize response activities
- * 6. Parse structured output
- * 7. Merge collected data (shallow merge)
- * 8. Save updated state (single save point — rollback on failure)
- * 9. Release lock
- * 10. Return WorkflowResponse
+ * 4. Call LLM provider
+ * 5. Parse structured output from normalized messages
+ * 6. Merge collected data (shallow merge)
+ * 7. Save updated state (single save point — rollback on failure)
+ * 8. Release lock
+ * 9. Return WorkflowResponse
  *
  * All dependencies are constructor-injected for testability.
+ * The orchestrator is backend-agnostic — it accepts any LlmProvider implementation.
  *
- * ORCH-01, ORCH-02, ORCH-03, ORCH-06
+ * ORCH-01, ORCH-02, ORCH-03, ORCH-06, PROV-03
  */
 export class WorkflowOrchestrator {
   private readonly workflowStore: WorkflowStateStore;
   private readonly conversationStore: ConversationStore;
-  private readonly copilotClient: CopilotStudioClient;
+  private readonly llmProvider: LlmProvider;
   private readonly lock: ConversationLock;
   private readonly definition: WorkflowDefinition;
   private readonly contextConfig?: ContextBuilderConfig;
@@ -68,13 +65,13 @@ export class WorkflowOrchestrator {
   constructor(deps: {
     workflowStore: WorkflowStateStore;
     conversationStore: ConversationStore;
-    copilotClient: CopilotStudioClient;
+    llmProvider: LlmProvider;
     lock: ConversationLock;
     config?: OrchestratorConfig;
   }) {
     this.workflowStore = deps.workflowStore;
     this.conversationStore = deps.conversationStore;
-    this.copilotClient = deps.copilotClient;
+    this.llmProvider = deps.llmProvider;
     this.lock = deps.lock;
     this.definition = deps.config?.workflowDefinition ?? DEFAULT_WORKFLOW_DEFINITION;
     this.contextConfig = deps.config?.contextBuilderConfig;
@@ -84,8 +81,8 @@ export class WorkflowOrchestrator {
    * Start a new workflow session.
    *
    * Creates initial WorkflowState scoped to userId/tenantId, saves it to the
-   * workflow store, starts a Copilot conversation, and creates a conversation
-   * record for history tracking.
+   * workflow store, starts a conversation via the LLM provider, and creates a
+   * conversation record for history tracking.
    *
    * ORCH-01
    */
@@ -109,17 +106,14 @@ export class WorkflowOrchestrator {
     // Save workflow state
     await this.workflowStore.set(conversationId, initialState);
 
-    // Start Copilot conversation and consume greeting activities
-    const startActivities: Activity[] = [];
-    for await (const activity of this.copilotClient.startConversationStreaming(true)) {
-      startActivities.push(activity);
-    }
+    // Start conversation via LLM provider and collect greeting messages
+    const greetingMessages = await this.llmProvider.startSession(conversationId);
 
     // Create conversation record
     const now = new Date().toISOString();
     await this.conversationStore.set(conversationId, {
       externalId: conversationId,
-      sdkConversationRef: startActivities,
+      sdkConversationRef: greetingMessages,
       history: [],
       userId,
       tenantId,
@@ -134,8 +128,8 @@ export class WorkflowOrchestrator {
   /**
    * Process a user text turn through the full orchestration loop.
    *
-   * Acquires lock -> loads state -> enriches query -> calls Copilot ->
-   * normalizes -> parses -> merges data -> saves state -> releases lock.
+   * Acquires lock -> loads state -> enriches query -> calls LLM provider ->
+   * parses -> merges data -> saves state -> releases lock.
    *
    * If any step after lock acquisition fails, state is NOT saved (rollback-on-failure).
    * Lock is always released in the finally block.
@@ -164,23 +158,17 @@ export class WorkflowOrchestrator {
       // Enrich query with accumulated context
       const { query } = buildContextualQuery(text, state, this.contextConfig);
 
-      // Build and send activity to Copilot
-      const userActivity: Activity = {
-        type: ActivityTypes.Message,
-        text: query,
-      } as Activity;
-
       const t0 = performance.now();
 
-      const collectedActivities: Activity[] = [];
-      for await (const activity of this.copilotClient.sendActivityStreaming(userActivity)) {
-        collectedActivities.push(activity);
-      }
+      // Send enriched query to LLM provider
+      const messages: NormalizedMessage[] = await this.llmProvider.sendMessage(
+        conversationId,
+        query
+      );
 
       const latencyMs = Math.round(performance.now() - t0);
 
-      // Normalize and parse
-      const messages: NormalizedMessage[] = normalizeActivities(collectedActivities);
+      // Parse structured output
       const parsedTurn = await parseTurn(messages);
 
       // Compute data delta
@@ -255,13 +243,13 @@ export class WorkflowOrchestrator {
    * Process a card action submission through the orchestration loop.
    *
    * Same lock-protected read-modify-write cycle as processTurn, but:
-   * - Activity contains submitData as value field (self-contained)
+   * - Delegates to LlmProvider.sendCardAction with submitData payload
    * - No context enrichment (card actions carry their own context)
    *
    * ORCH-03
    */
   async processCardAction(params: ProcessCardActionParams): Promise<WorkflowResponse> {
-    const { conversationId, cardId, userSummary, submitData, userId, tenantId } = params;
+    const { conversationId, cardId, submitData, userId, tenantId } = params;
 
     const release = await this.lock.acquire(conversationId);
 
@@ -279,24 +267,17 @@ export class WorkflowOrchestrator {
         };
       }
 
-      // Build card action activity with submitData in value
-      const cardActivity = {
-        type: ActivityTypes.Message,
-        text: userSummary,
-        value: { ...submitData, cardId },
-      } as Activity;
-
       const t0 = performance.now();
 
-      const collectedActivities: Activity[] = [];
-      for await (const activity of this.copilotClient.sendActivityStreaming(cardActivity)) {
-        collectedActivities.push(activity);
-      }
+      // Send card action to LLM provider
+      const messages: NormalizedMessage[] = await this.llmProvider.sendCardAction(
+        conversationId,
+        { ...submitData, cardId }
+      );
 
       const latencyMs = Math.round(performance.now() - t0);
 
-      // Normalize and parse
-      const messages: NormalizedMessage[] = normalizeActivities(collectedActivities);
+      // Parse structured output
       const parsedTurn = await parseTurn(messages);
 
       // Compute data delta

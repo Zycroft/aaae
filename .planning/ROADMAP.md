@@ -95,7 +95,11 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
 
 - [x] **Phase 23: LLM Provider Interface + Config** - Define provider contract and make config provider-aware (completed 2026-02-24)
 - [x] **Phase 24: CopilotProvider Extraction** - Wrap existing Copilot logic behind LlmProvider interface (completed 2026-02-24)
+<<<<<<< HEAD
 - [ ] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only
+=======
+- [x] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only (completed 2026-02-24)
+>>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
 - [ ] **Phase 26: OpenAI Provider Implementation** - Create working OpenAI-backed LlmProvider
 - [ ] **Phase 27: Provider Factory + Auth Polish** - Wire config-driven backend selection and health reporting
 - [ ] **Phase 28: Testing + Verification** - Full test coverage for both providers and the factory
@@ -153,7 +157,10 @@ Plans:
   3. The structured output from OpenAI includes an `extractedPayload` field matching the existing schema contract
   4. A card action submit is converted to a text description and processed through `sendMessage` without error
   5. The OpenAI model used is controlled by the `OPENAI_MODEL` env var and defaults to `gpt-4o-mini`
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 26-01-PLAN.md — OpenAiProvider TDD (implements LlmProvider with OpenAI chat completions, structured output, history, card action conversion)
 
 ### Phase 27: Provider Factory + Auth Polish
 **Goal**: Config alone determines which backend runs — switching providers requires no code changes, and the health endpoint surfaces the active provider for operator observability.
@@ -207,7 +214,11 @@ Plans:
 | 22. Integration Testing | v1.6 | 1/1 | Complete | 2026-02-23 |
 | 23. LLM Provider Interface + Config | v1.7 | 1/1 | Complete | 2026-02-24 |
 | 24. CopilotProvider Extraction | 1/1 | Complete    | 2026-02-24 | - |
+<<<<<<< HEAD
 | 25. Orchestrator Refactor to LlmProvider | v1.7 | 0/? | Not started | - |
+=======
+| 25. Orchestrator Refactor to LlmProvider | 1/1 | Complete    | 2026-02-24 | - |
+>>>>>>> gsd/phase-25-orchestrator-refactor-to-llmprovider
 | 26. OpenAI Provider Implementation | v1.7 | 0/? | Not started | - |
 | 27. Provider Factory + Auth Polish | v1.7 | 0/? | Not started | - |
 | 28. Testing + Verification | v1.7 | 0/? | Not started | - |

@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Activity } from '@microsoft/agents-activity';
-import type { WorkflowState } from '@copilot-chat/shared';
+import type { WorkflowState, NormalizedMessage } from '@copilot-chat/shared';
 import type { WorkflowStateStore } from '../store/WorkflowStateStore.js';
 import type { ConversationStore } from '../store/ConversationStore.js';
 import type { ConversationLock } from '../lock/ConversationLock.js';
-import type { CopilotStudioClient } from '@microsoft/agents-copilotstudio-client';
+import type { LlmProvider } from '../provider/LlmProvider.js';
 import { WorkflowOrchestrator } from './WorkflowOrchestrator.js';
 import { DEFAULT_WORKFLOW_DEFINITION } from '../workflow/workflowDefinition.js';
 
@@ -12,9 +11,9 @@ import { DEFAULT_WORKFLOW_DEFINITION } from '../workflow/workflowDefinition.js';
  * Integration test for WorkflowOrchestrator multi-turn data accumulation.
  *
  * Demonstrates TEST-03: collectedData accumulates across 3+ sequential
- * processTurn calls and appears in successive Copilot query preambles.
+ * processTurn calls and appears in successive query preambles.
  *
- * Uses fully mocked dependencies (no real Redis, no real Copilot calls).
+ * Uses fully mocked dependencies (no real Redis, no real LLM calls).
  * Mock stores use real Map operations for state persistence across calls.
  *
  * TEST-03
@@ -22,19 +21,30 @@ import { DEFAULT_WORKFLOW_DEFINITION } from '../workflow/workflowDefinition.js';
 
 // ── Mock helpers ──
 
-/** Produces a minimal bot Activity with optional structured value */
-function botActivity(text: string, value?: Record<string, unknown>): Activity {
-  return {
-    type: 'message',
-    text,
-    from: { role: 'bot' },
-    ...(value !== undefined ? { value } : {}),
-  } as unknown as Activity;
-}
+/** Counter for unique IDs in test messages */
+let msgCounter = 0;
 
-/** Creates an async generator yielding activities one by one */
-async function* mockStream(activities: Activity[]): AsyncGenerator<Activity> {
-  for (const a of activities) yield a;
+/** Produces a NormalizedMessage with optional extractedPayload (for structured responses) */
+function textMessage(
+  text: string,
+  structuredData?: Record<string, unknown>
+): NormalizedMessage {
+  msgCounter++;
+  return {
+    id: `00000000-0000-0000-0000-${String(msgCounter).padStart(12, '0')}`,
+    role: 'assistant' as const,
+    kind: 'text' as const,
+    text,
+    ...(structuredData
+      ? {
+          extractedPayload: {
+            source: 'value' as const,
+            confidence: 'high' as const,
+            data: structuredData,
+          },
+        }
+      : {}),
+  };
 }
 
 // ── In-memory store helpers ──
@@ -102,13 +112,16 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
   let conversationStoreMock: ReturnType<typeof makeConversationStore>['mock'];
   let mockRelease: ReturnType<typeof vi.fn>;
   let mockLock: { acquire: ReturnType<typeof vi.fn> };
-  let mockCopilotClient: {
-    startConversationStreaming: ReturnType<typeof vi.fn>;
-    sendActivityStreaming: ReturnType<typeof vi.fn>;
+  let mockLlmProvider: {
+    startSession: ReturnType<typeof vi.fn>;
+    sendMessage: ReturnType<typeof vi.fn>;
+    sendCardAction: ReturnType<typeof vi.fn>;
   };
   let orchestrator: WorkflowOrchestrator;
 
   beforeEach(() => {
+    msgCounter = 0;
+
     const wfStore = makeWorkflowStore();
     workflowStoreMock = wfStore.mock;
 
@@ -120,17 +133,16 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
       acquire: vi.fn().mockResolvedValue(mockRelease),
     };
 
-    mockCopilotClient = {
-      startConversationStreaming: vi
-        .fn()
-        .mockReturnValue(mockStream([botActivity('Welcome!')])),
-      sendActivityStreaming: vi.fn(),
+    mockLlmProvider = {
+      startSession: vi.fn().mockResolvedValue([textMessage('Welcome!')]),
+      sendMessage: vi.fn(),
+      sendCardAction: vi.fn().mockResolvedValue([textMessage('Card response')]),
     };
 
     orchestrator = new WorkflowOrchestrator({
       workflowStore: workflowStoreMock as unknown as WorkflowStateStore,
       conversationStore: conversationStoreMock as unknown as ConversationStore,
-      copilotClient: mockCopilotClient as unknown as CopilotStudioClient,
+      llmProvider: mockLlmProvider as unknown as LlmProvider,
       lock: mockLock as unknown as ConversationLock,
       config: { workflowDefinition: DEFAULT_WORKFLOW_DEFINITION },
     });
@@ -141,37 +153,31 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
   // ────────────────────────────────────────────────────────────────
 
   it('accumulates collectedData across 3 turns and includes prior data in each query preamble', async () => {
-    // Turn 1: Copilot returns name=Alice
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([
-        botActivity('What is your age?', {
-          action: 'ask',
-          data: { name: 'Alice' },
-          prompt: 'What is your age?',
-        }),
-      ])
-    );
+    // Turn 1: LLM returns name=Alice
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('What is your age?', {
+        action: 'ask',
+        data: { name: 'Alice' },
+        prompt: 'What is your age?',
+      }),
+    ]);
 
-    // Turn 2: Copilot returns age=30
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([
-        botActivity('What is your location?', {
-          action: 'ask',
-          data: { age: 30 },
-          prompt: 'What is your location?',
-        }),
-      ])
-    );
+    // Turn 2: LLM returns age=30
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('What is your location?', {
+        action: 'ask',
+        data: { age: 30 },
+        prompt: 'What is your location?',
+      }),
+    ]);
 
-    // Turn 3: Copilot returns location=Seattle, completes workflow
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([
-        botActivity('Thank you!', {
-          action: 'complete',
-          data: { location: 'Seattle' },
-        }),
-      ])
-    );
+    // Turn 3: LLM returns location=Seattle, completes workflow
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('Thank you!', {
+        action: 'complete',
+        data: { location: 'Seattle' },
+      }),
+    ]);
 
     // ── Turn 1 ──
     const turn1Result = await orchestrator.processTurn({
@@ -197,10 +203,9 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
     });
 
     // Query sent on turn 2 should include context preamble with turn-1 data
-    const turn2Activity =
-      mockCopilotClient.sendActivityStreaming.mock.calls[1][0] as Activity;
-    expect(turn2Activity.text).toContain('[CONTEXT]');
-    expect(turn2Activity.text).toContain('name');
+    const turn2Query = mockLlmProvider.sendMessage.mock.calls[1][1] as string;
+    expect(turn2Query).toContain('[CONTEXT]');
+    expect(turn2Query).toContain('name');
 
     // ── Turn 3 ──
     const turn3Result = await orchestrator.processTurn({
@@ -217,14 +222,13 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
     });
 
     // Query sent on turn 3 should include context preamble with turns 1+2 data
-    const turn3Activity =
-      mockCopilotClient.sendActivityStreaming.mock.calls[2][0] as Activity;
-    expect(turn3Activity.text).toContain('[CONTEXT]');
-    expect(turn3Activity.text).toContain('name');
-    expect(turn3Activity.text).toContain('age');
+    const turn3Query = mockLlmProvider.sendMessage.mock.calls[2][1] as string;
+    expect(turn3Query).toContain('[CONTEXT]');
+    expect(turn3Query).toContain('name');
+    expect(turn3Query).toContain('age');
 
     // All three processTurn calls resolved without throwing — verified by reaching here
-    expect(mockCopilotClient.sendActivityStreaming).toHaveBeenCalledTimes(3);
+    expect(mockLlmProvider.sendMessage).toHaveBeenCalledTimes(3);
     expect(mockRelease).toHaveBeenCalledTimes(3);
   });
 
@@ -235,9 +239,9 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
   it('increments turnCount on each successive processTurn call', async () => {
     // Three identical plain-text responses
     for (let i = 0; i < 3; i++) {
-      mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-        mockStream([botActivity('Reply ' + (i + 1))])
-      );
+      mockLlmProvider.sendMessage.mockResolvedValueOnce([
+        textMessage('Reply ' + (i + 1)),
+      ]);
     }
 
     const r1 = await orchestrator.processTurn({
@@ -269,10 +273,10 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
   // ────────────────────────────────────────────────────────────────
 
   it('passthrough mode — plain text response leaves collectedData empty', async () => {
-    // No value field → activity normalizer produces no extractedPayload
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([botActivity('Just a plain text response, no structured data')])
-    );
+    // No extractedPayload → parseTurn produces passthrough
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('Just a plain text response, no structured data'),
+    ]);
 
     const result = await orchestrator.processTurn({
       conversationId: CONV_ID,
@@ -304,15 +308,13 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
   // ────────────────────────────────────────────────────────────────
 
   it('parse_error kind — invalid action in response does not throw, collectedData unchanged', async () => {
-    // activity.value has an invalid action enum value
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([
-        botActivity('Bad response', {
-          action: 'INVALID_ACTION_VALUE',
-          data: { shouldNotBeCollected: true },
-        }),
-      ])
-    );
+    // extractedPayload.data has an invalid action enum value
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('Bad response', {
+        action: 'INVALID_ACTION_VALUE',
+        data: { shouldNotBeCollected: true },
+      }),
+    ]);
 
     const result = await orchestrator.processTurn({
       conversationId: CONV_ID,
@@ -337,26 +339,22 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
 
   it('exercises passthrough, structured, and parse_error kinds without throwing', async () => {
     // passthrough
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([botActivity('Plain text')])
-    );
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('Plain text'),
+    ]);
     // structured
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([
-        botActivity('Structured', {
-          action: 'ask',
-          data: { field: 'value' },
-        }),
-      ])
-    );
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('Structured', {
+        action: 'ask',
+        data: { field: 'value' },
+      }),
+    ]);
     // parse_error
-    mockCopilotClient.sendActivityStreaming.mockReturnValueOnce(
-      mockStream([
-        botActivity('Error', {
-          action: 'UNKNOWN_INVALID',
-        }),
-      ])
-    );
+    mockLlmProvider.sendMessage.mockResolvedValueOnce([
+      textMessage('Error', {
+        action: 'UNKNOWN_INVALID',
+      }),
+    ]);
 
     const passthroughResult = await orchestrator.processTurn({
       conversationId: CONV_ID,
@@ -382,6 +380,6 @@ describe('WorkflowOrchestrator integration — multi-turn data accumulation', ()
     expect(parseErrorResult.parsedTurn.kind).toBe('parse_error');
 
     // All resolved without throwing — verified by reaching here
-    expect(mockCopilotClient.sendActivityStreaming).toHaveBeenCalledTimes(3);
+    expect(mockLlmProvider.sendMessage).toHaveBeenCalledTimes(3);
   });
 });

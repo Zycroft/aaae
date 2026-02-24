@@ -1,28 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Activity } from '@microsoft/agents-activity';
-import type { WorkflowState } from '@copilot-chat/shared';
+import type { WorkflowState, NormalizedMessage } from '@copilot-chat/shared';
 import type { WorkflowStateStore } from '../store/WorkflowStateStore.js';
 import type { ConversationStore } from '../store/ConversationStore.js';
 import type { ConversationLock } from '../lock/ConversationLock.js';
-import type { CopilotStudioClient } from '@microsoft/agents-copilotstudio-client';
+import type { LlmProvider } from '../provider/LlmProvider.js';
 import { WorkflowOrchestrator } from './WorkflowOrchestrator.js';
 import { DEFAULT_WORKFLOW_DEFINITION } from '../workflow/workflowDefinition.js';
 
 // ── Mock helpers ──
 
-/** Produces a minimal bot Activity with text content */
-function botActivity(text: string, value?: Record<string, unknown>): Activity {
-  return {
-    type: 'message',
-    text,
-    from: { role: 'bot' },
-    ...(value !== undefined ? { value } : {}),
-  } as unknown as Activity;
-}
+/** Counter for unique IDs in test messages */
+let msgCounter = 0;
 
-/** Creates an async generator yielding activities one by one */
-async function* mockStream(activities: Activity[]): AsyncGenerator<Activity> {
-  for (const a of activities) yield a;
+/** Produces a NormalizedMessage with optional extractedPayload (for structured responses) */
+function textMessage(
+  text: string,
+  structuredData?: Record<string, unknown>
+): NormalizedMessage {
+  msgCounter++;
+  return {
+    id: `00000000-0000-0000-0000-${String(msgCounter).padStart(12, '0')}`,
+    role: 'assistant' as const,
+    kind: 'text' as const,
+    text,
+    ...(structuredData
+      ? {
+          extractedPayload: {
+            source: 'value' as const,
+            confidence: 'high' as const,
+            data: structuredData,
+          },
+        }
+      : {}),
+  };
 }
 
 // ── Shared mocks ──
@@ -40,9 +50,10 @@ let mockConversationStore: {
 };
 let mockRelease: ReturnType<typeof vi.fn>;
 let mockLock: { acquire: ReturnType<typeof vi.fn> };
-let mockCopilotClient: {
-  startConversationStreaming: ReturnType<typeof vi.fn>;
-  sendActivityStreaming: ReturnType<typeof vi.fn>;
+let mockLlmProvider: {
+  startSession: ReturnType<typeof vi.fn>;
+  sendMessage: ReturnType<typeof vi.fn>;
+  sendCardAction: ReturnType<typeof vi.fn>;
 };
 
 let orchestrator: WorkflowOrchestrator;
@@ -65,6 +76,8 @@ function baseState(overrides: Partial<WorkflowState> = {}): WorkflowState {
 }
 
 beforeEach(() => {
+  msgCounter = 0;
+
   mockWorkflowStore = {
     get: vi.fn().mockResolvedValue(undefined),
     set: vi.fn().mockResolvedValue(undefined),
@@ -83,20 +96,17 @@ beforeEach(() => {
     acquire: vi.fn().mockResolvedValue(mockRelease),
   };
 
-  // Default: copilot returns a simple text reply
-  mockCopilotClient = {
-    startConversationStreaming: vi
-      .fn()
-      .mockReturnValue(mockStream([botActivity('Welcome!')])),
-    sendActivityStreaming: vi
-      .fn()
-      .mockReturnValue(mockStream([botActivity('Got it.')])),
+  // Default: LLM provider returns a simple text reply
+  mockLlmProvider = {
+    startSession: vi.fn().mockResolvedValue([textMessage('Welcome!')]),
+    sendMessage: vi.fn().mockResolvedValue([textMessage('Got it.')]),
+    sendCardAction: vi.fn().mockResolvedValue([textMessage('Got it.')]),
   };
 
   orchestrator = new WorkflowOrchestrator({
     workflowStore: mockWorkflowStore as unknown as WorkflowStateStore,
     conversationStore: mockConversationStore as unknown as ConversationStore,
-    copilotClient: mockCopilotClient as unknown as CopilotStudioClient,
+    llmProvider: mockLlmProvider as unknown as LlmProvider,
     lock: mockLock as unknown as ConversationLock,
     config: { workflowDefinition: DEFAULT_WORKFLOW_DEFINITION },
   });
@@ -158,8 +168,8 @@ describe('WorkflowOrchestrator', () => {
     expect(mockWorkflowStore.get).toHaveBeenCalledWith(CONV_ID);
     expect(mockWorkflowStore.set).toHaveBeenCalledOnce();
 
-    // Copilot called
-    expect(mockCopilotClient.sendActivityStreaming).toHaveBeenCalledOnce();
+    // LLM provider called
+    expect(mockLlmProvider.sendMessage).toHaveBeenCalledOnce();
 
     // Turn count incremented
     const savedState = mockWorkflowStore.set.mock.calls[0][1] as WorkflowState;
@@ -189,11 +199,11 @@ describe('WorkflowOrchestrator', () => {
       tenantId: TENANT_ID,
     });
 
-    // The activity sent to copilot should contain context preamble
-    const sentActivity = mockCopilotClient.sendActivityStreaming.mock.calls[0][0] as Activity;
-    expect(sentActivity.text).toContain('Phase:');
-    expect(sentActivity.text).toContain('"name":"Alice"');
-    expect(sentActivity.text).toContain('next question');
+    // The query sent to LLM provider should contain context preamble
+    const sentQuery = mockLlmProvider.sendMessage.mock.calls[0][1] as string;
+    expect(sentQuery).toContain('Phase:');
+    expect(sentQuery).toContain('"name":"Alice"');
+    expect(sentQuery).toContain('next question');
   });
 
   // 4. data merging
@@ -202,15 +212,13 @@ describe('WorkflowOrchestrator', () => {
       baseState({ collectedData: { name: 'Alice' } })
     );
 
-    // Copilot returns structured response with data
-    mockCopilotClient.sendActivityStreaming.mockReturnValue(
-      mockStream([
-        botActivity('Here you go', {
-          action: 'ask',
-          data: { age: 30 },
-        }),
-      ])
-    );
+    // LLM provider returns structured response with data
+    mockLlmProvider.sendMessage.mockResolvedValue([
+      textMessage('Here you go', {
+        action: 'ask',
+        data: { age: 30 },
+      }),
+    ]);
 
     const response = await orchestrator.processTurn({
       conversationId: CONV_ID,
@@ -234,10 +242,10 @@ describe('WorkflowOrchestrator', () => {
       baseState({ collectedData: { name: 'Alice' } })
     );
 
-    // Copilot returns plain text (no structured data)
-    mockCopilotClient.sendActivityStreaming.mockReturnValue(
-      mockStream([botActivity('Just some text')])
-    );
+    // LLM provider returns plain text (no structured data)
+    mockLlmProvider.sendMessage.mockResolvedValue([
+      textMessage('Just some text'),
+    ]);
 
     const response = await orchestrator.processTurn({
       conversationId: CONV_ID,
@@ -269,10 +277,9 @@ describe('WorkflowOrchestrator', () => {
     expect(mockLock.acquire).toHaveBeenCalledWith(CONV_ID);
     expect(mockRelease).toHaveBeenCalledOnce();
 
-    // Copilot called with activity containing submitData
-    const sentActivity = mockCopilotClient.sendActivityStreaming.mock.calls[0][0] as Activity;
-    expect(sentActivity.text).toBe('User selected option A');
-    expect((sentActivity as Record<string, unknown>).value).toEqual({
+    // LLM provider called with card action data
+    expect(mockLlmProvider.sendCardAction).toHaveBeenCalledOnce();
+    expect(mockLlmProvider.sendCardAction).toHaveBeenCalledWith(CONV_ID, {
       choice: 'A',
       cardId: 'card-1',
     });
@@ -284,11 +291,9 @@ describe('WorkflowOrchestrator', () => {
   });
 
   // 7. rollback on failure
-  it('processTurn rolls back on Copilot failure — state NOT saved', async () => {
+  it('processTurn rolls back on LLM provider failure — state NOT saved', async () => {
     mockWorkflowStore.get.mockResolvedValue(baseState());
-    mockCopilotClient.sendActivityStreaming.mockImplementation(() => {
-      throw new Error('Copilot timeout');
-    });
+    mockLlmProvider.sendMessage.mockRejectedValue(new Error('Copilot timeout'));
 
     await expect(
       orchestrator.processTurn({
@@ -323,9 +328,7 @@ describe('WorkflowOrchestrator', () => {
     mockWorkflowStore.set.mockImplementation(async () => {
       callOrder.push('set');
     });
-    mockCopilotClient.sendActivityStreaming.mockReturnValue(
-      mockStream([botActivity('OK')])
-    );
+    mockLlmProvider.sendMessage.mockResolvedValue([textMessage('OK')]);
 
     await orchestrator.processTurn({
       conversationId: CONV_ID,
@@ -364,9 +367,9 @@ describe('WorkflowOrchestrator', () => {
     mockWorkflowStore.get.mockResolvedValue(baseState({ step: 'confirm' }));
 
     // Return structured with action 'confirm' to keep step at confirm
-    mockCopilotClient.sendActivityStreaming.mockReturnValue(
-      mockStream([botActivity('Confirm this?', { action: 'confirm' })])
-    );
+    mockLlmProvider.sendMessage.mockResolvedValue([
+      textMessage('Confirm this?', { action: 'confirm' }),
+    ]);
 
     const response = await orchestrator.processTurn({
       conversationId: CONV_ID,
