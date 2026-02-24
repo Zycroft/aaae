@@ -112,7 +112,10 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
   3. Server fails with a fatal error when `LLM_PROVIDER=openai` is set but `OPENAI_API_KEY` is missing
   4. Server fails with a fatal error when `LLM_PROVIDER=copilot` is set but Copilot env vars are missing
   5. `LlmProvider` interface file exists with `startSession`, `sendMessage`, `sendCardAction` method signatures
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 23-01-PLAN.md — LlmProvider interface + conditional config validation
 
 ### Phase 24: CopilotProvider Extraction
 **Goal**: All Copilot-specific SDK code lives inside `CopilotProvider` — the existing `copilot.ts`, `activityNormalizer.ts`, and `structuredOutputParser.ts` files are untouched.
