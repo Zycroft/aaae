@@ -10,7 +10,7 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 ### Provider Abstraction
 
 - [x] **PROV-01**: Server defines `LlmProvider` interface with `startSession`, `sendMessage`, `sendCardAction` methods returning `NormalizedMessage[]`
-- [ ] **PROV-02**: `CopilotProvider` wraps existing `CopilotStudioClient` behind `LlmProvider` interface
+- [x] **PROV-02**: `CopilotProvider` wraps existing `CopilotStudioClient` behind `LlmProvider` interface
 - [ ] **PROV-03**: `WorkflowOrchestrator` depends on `LlmProvider` interface, not `CopilotStudioClient` directly
 - [ ] **PROV-04**: Provider factory selects backend based on `LLM_PROVIDER` config value
 - [ ] **PROV-05**: Provider factory lazy-loads only the selected backend's SDK
@@ -36,7 +36,7 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 
 - [ ] **COMPAT-01**: `LLM_PROVIDER=copilot` behavior identical to pre-refactor (zero regression)
 - [ ] **COMPAT-02**: `shared/` and `client/` require no changes
-- [ ] **COMPAT-03**: Existing `copilot.ts`, `activityNormalizer.ts`, `structuredOutputParser.ts` unchanged
+- [x] **COMPAT-03**: Existing `copilot.ts`, `activityNormalizer.ts`, `structuredOutputParser.ts` unchanged
 
 ### Testing
 
@@ -78,8 +78,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-01 | Phase 23 | Complete |
 | CONF-02 | Phase 23 | Complete |
 | CONF-03 | Phase 23 | Complete |
-| PROV-02 | Phase 24 | Pending |
-| COMPAT-03 | Phase 24 | Pending |
+| PROV-02 | Phase 24 | Complete |
+| COMPAT-03 | Phase 24 | Complete |
 | PROV-03 | Phase 25 | Pending |
 | COMPAT-01 | Phase 25 | Pending |
 | OAPI-01 | Phase 26 | Pending |

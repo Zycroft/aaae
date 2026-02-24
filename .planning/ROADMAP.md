@@ -94,7 +94,7 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
 ### v1.7 OpenAI Dev/Demo Backend (Phases 23–28)
 
 - [x] **Phase 23: LLM Provider Interface + Config** - Define provider contract and make config provider-aware (completed 2026-02-24)
-- [ ] **Phase 24: CopilotProvider Extraction** - Wrap existing Copilot logic behind LlmProvider interface
+- [x] **Phase 24: CopilotProvider Extraction** - Wrap existing Copilot logic behind LlmProvider interface (completed 2026-02-24)
 - [ ] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only
 - [ ] **Phase 26: OpenAI Provider Implementation** - Create working OpenAI-backed LlmProvider
 - [ ] **Phase 27: Provider Factory + Auth Polish** - Wire config-driven backend selection and health reporting
@@ -138,7 +138,10 @@ Plans:
   1. `WorkflowOrchestrator.ts` contains no imports from `@microsoft/agents-copilotstudio-client`
   2. All 147 existing server tests pass after the refactor
   3. A conversation started via `LLM_PROVIDER=copilot` produces identical responses to the pre-refactor baseline
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 25-01-PLAN.md — Refactor orchestrator to LlmProvider + update tests
 
 ### Phase 26: OpenAI Provider Implementation
 **Goal**: A new `OpenAiProvider` delivers multi-turn conversations through the chat completions API, returning `NormalizedMessage[]` with structured `extractedPayload` that the existing orchestrator and parser already understand.
@@ -203,7 +206,7 @@ Plans:
 | 21. Dynamic Input + Completion + MetadataPane | v1.6 | 3/3 | Complete | 2026-02-23 |
 | 22. Integration Testing | v1.6 | 1/1 | Complete | 2026-02-23 |
 | 23. LLM Provider Interface + Config | v1.7 | 1/1 | Complete | 2026-02-24 |
-| 24. CopilotProvider Extraction | v1.7 | 0/1 | Planned | - |
+| 24. CopilotProvider Extraction | 1/1 | Complete    | 2026-02-24 | - |
 | 25. Orchestrator Refactor to LlmProvider | v1.7 | 0/? | Not started | - |
 | 26. OpenAI Provider Implementation | v1.7 | 0/? | Not started | - |
 | 27. Provider Factory + Auth Polish | v1.7 | 0/? | Not started | - |

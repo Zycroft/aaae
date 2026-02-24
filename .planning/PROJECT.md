@@ -140,6 +140,8 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ LlmProvider interface with startSession/sendMessage/sendCardAction returning NormalizedMessage[] — v1.7 Phase 23
 - ✓ LLM_PROVIDER env var with conditional provider validation (Copilot or OpenAI) — v1.7 Phase 23
 - ✓ OPENAI_API_KEY required only when LLM_PROVIDER=openai, Copilot vars only when LLM_PROVIDER=copilot — v1.7 Phase 23
+- ✓ CopilotProvider wraps CopilotStudioClient behind LlmProvider interface — v1.7 Phase 24
+- ✓ Existing copilot.ts, activityNormalizer.ts, structuredOutputParser.ts byte-for-byte unchanged — v1.7 Phase 24
 
 ### Active
 
@@ -264,6 +266,8 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | LLM_PROVIDER defaults to 'copilot' | Existing deployments without new env var continue unchanged | ✓ Good — full backward compatibility |
 | Conditional env var validation per provider | Copilot vars only required for copilot, OpenAI vars only for openai | ✓ Good — fail-loud on missing vars |
 | COPILOT_ fields use `?? ''` instead of `!` assertion | Validation is now conditional so `!` assertion is unsafe | ✓ Good — no runtime assertion errors |
+| CopilotProvider constructor injection | Accepts CopilotStudioClient via constructor, not module-level import | ✓ Good — enables unit testing with mocks |
+| sendCardAction passes actionValue as activity.value | Direct delegation with empty text string | ✓ Good — consistent with existing card-action route logic |
 
 ---
-*Last updated: 2026-02-24 after Phase 23 (LLM Provider Interface + Config)*
+*Last updated: 2026-02-24 after Phase 24 (CopilotProvider Extraction)*

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 24: CopilotProvider Extraction
+**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 25: Orchestrator Refactor to LlmProvider
 
 ## Current Position
 
-Phase: 24 — CopilotProvider Extraction
+Phase: 25 — Orchestrator Refactor to LlmProvider
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-02-24 — Phase 23 complete (LlmProvider interface + conditional config validation)
+Last activity: 2026-02-24 — Phase 24 complete (CopilotProvider extraction behind LlmProvider)
 
-Progress: █░░░░░░░░░ 1/6 phases (v1.7)
+Progress: ██░░░░░░░░ 2/6 phases (v1.7)
 
 ## Performance Metrics
 
@@ -38,6 +38,11 @@ Progress: █░░░░░░░░░ 1/6 phases (v1.7)
 ### Decisions
 
 All decisions logged in PROJECT.md Key Decisions table.
+
+**24-01 Decisions:**
+- CopilotProvider uses constructor injection for CopilotStudioClient — enables unit testing with mocks
+- conversationId parameter unused by Copilot SDK (manages its own state) — prefixed with _
+- sendCardAction passes actionValue directly as activity.value with empty text
 
 **23-01 Decisions:**
 - LlmProvider interface methods all return `Promise<NormalizedMessage[]>` — implementations normalize internally
@@ -66,5 +71,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Phase 23 complete, ready to plan Phase 24
+Stopped at: Phase 24 complete, ready to plan Phase 25
 Resume file: None
