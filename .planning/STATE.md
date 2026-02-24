@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-23)
+See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** Users can interact with a Copilot Studio agent through a polished chat UI that seamlessly mixes text responses and interactive Adaptive Cards — server-side only, secrets protected, authenticated via Entra External ID.
-**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 23: LLM Provider Interface + Config
+**Current focus:** v1.7 OpenAI Dev/Demo Backend — Phase 24: CopilotProvider Extraction
 
 ## Current Position
 
-Phase: 23 — LLM Provider Interface + Config
-Plan: —
-Status: Roadmap created, ready to plan Phase 23
-Last activity: 2026-02-23 — v1.7 roadmap created (Phases 23–28)
+Phase: 24 — CopilotProvider Extraction
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-24 — Phase 23 complete (LlmProvider interface + conditional config validation)
 
-Progress: ░░░░░░░░░░ 0/6 phases (v1.7)
+Progress: █░░░░░░░░░ 1/6 phases (v1.7)
 
 ## Performance Metrics
 
@@ -39,6 +39,12 @@ Progress: ░░░░░░░░░░ 0/6 phases (v1.7)
 
 All decisions logged in PROJECT.md Key Decisions table.
 
+**23-01 Decisions:**
+- LlmProvider interface methods all return `Promise<NormalizedMessage[]>` — implementations normalize internally
+- LLM_PROVIDER defaults to 'copilot' for full backward-compatibility
+- Invalid LLM_PROVIDER value causes immediate FATAL exit — no silent fallback
+- COPILOT_ENVIRONMENT_ID/AGENT_SCHEMA_NAME use `?? ''` instead of `!` since validation is conditional
+
 ### v1.7 Key Architecture Decisions
 
 - `LlmProvider` interface owns all normalization internally — orchestrator receives `NormalizedMessage[]` only
@@ -59,7 +65,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-23
-Stopped at: v1.7 roadmap creation complete
-Resume file: .planning/ROADMAP.md
-Next step: `/gsd:plan-phase 23` — plan Phase 23: LLM Provider Interface + Config
+Last session: 2026-02-24
+Stopped at: Phase 23 complete, ready to plan Phase 24
+Resume file: None

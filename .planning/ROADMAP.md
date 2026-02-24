@@ -93,7 +93,7 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
 
 ### v1.7 OpenAI Dev/Demo Backend (Phases 23–28)
 
-- [ ] **Phase 23: LLM Provider Interface + Config** - Define provider contract and make config provider-aware
+- [x] **Phase 23: LLM Provider Interface + Config** - Define provider contract and make config provider-aware (completed 2026-02-24)
 - [ ] **Phase 24: CopilotProvider Extraction** - Wrap existing Copilot logic behind LlmProvider interface
 - [ ] **Phase 25: Orchestrator Refactor to LlmProvider** - WorkflowOrchestrator depends on interface only
 - [ ] **Phase 26: OpenAI Provider Implementation** - Create working OpenAI-backed LlmProvider
@@ -115,7 +115,7 @@ Full phase details: `.planning/milestones/v1.6-ROADMAP.md`
 **Plans**: 1 plan
 
 Plans:
-- [ ] 23-01-PLAN.md — LlmProvider interface + conditional config validation
+- [x] 23-01-PLAN.md — LlmProvider interface + conditional config validation
 
 ### Phase 24: CopilotProvider Extraction
 **Goal**: All Copilot-specific SDK code lives inside `CopilotProvider` — the existing `copilot.ts`, `activityNormalizer.ts`, and `structuredOutputParser.ts` files are untouched.
@@ -125,7 +125,10 @@ Plans:
   1. `CopilotProvider` class exists in `server/src/provider/` and implements `LlmProvider`
   2. All pre-existing server tests pass with zero changes to existing test files
   3. `copilot.ts`, `activityNormalizer.ts`, and `structuredOutputParser.ts` are byte-for-byte unchanged
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 24-01-PLAN.md — CopilotProvider class + unit tests
 
 ### Phase 25: Orchestrator Refactor to LlmProvider
 **Goal**: `WorkflowOrchestrator` has zero direct knowledge of Copilot Studio — it accepts any `LlmProvider` and the Copilot path continues to work identically.
@@ -199,8 +202,8 @@ Plans:
 | 20. Shell Wiring + Progress Indicator + Transcript | v1.6 | 3/3 | Complete | 2026-02-23 |
 | 21. Dynamic Input + Completion + MetadataPane | v1.6 | 3/3 | Complete | 2026-02-23 |
 | 22. Integration Testing | v1.6 | 1/1 | Complete | 2026-02-23 |
-| 23. LLM Provider Interface + Config | v1.7 | 0/? | Not started | - |
-| 24. CopilotProvider Extraction | v1.7 | 0/? | Not started | - |
+| 23. LLM Provider Interface + Config | v1.7 | 1/1 | Complete | 2026-02-24 |
+| 24. CopilotProvider Extraction | v1.7 | 0/1 | Planned | - |
 | 25. Orchestrator Refactor to LlmProvider | v1.7 | 0/? | Not started | - |
 | 26. OpenAI Provider Implementation | v1.7 | 0/? | Not started | - |
 | 27. Provider Factory + Auth Polish | v1.7 | 0/? | Not started | - |

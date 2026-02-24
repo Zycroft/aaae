@@ -1,12 +1,30 @@
 import 'dotenv/config'; // Must be first — loads .env before any validation
 
-// Required env vars — server will NOT start without these
-const REQUIRED = ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME'] as const;
+// --- LLM Provider selection ---
+const LLM_PROVIDER = process.env.LLM_PROVIDER ?? 'copilot';
 
-for (const key of REQUIRED) {
-  if (!process.env[key]) {
-    console.error(`[config] FATAL: Missing required environment variable: ${key}`);
-    console.error(`[config] Copy server/.env.example to server/.env and fill in values.`);
+if (LLM_PROVIDER !== 'copilot' && LLM_PROVIDER !== 'openai') {
+  console.error(
+    `[config] FATAL: LLM_PROVIDER="${LLM_PROVIDER}" is not valid. Must be "copilot" or "openai".`
+  );
+  process.exit(1);
+}
+
+if (LLM_PROVIDER === 'copilot') {
+  const COPILOT_REQUIRED = ['COPILOT_ENVIRONMENT_ID', 'COPILOT_AGENT_SCHEMA_NAME'] as const;
+  for (const key of COPILOT_REQUIRED) {
+    if (!process.env[key]) {
+      console.error(`[config] FATAL: Missing required env var: ${key}`);
+      console.error(`[config] Copy server/.env.example to server/.env and fill in values.`);
+      process.exit(1);
+    }
+  }
+}
+
+if (LLM_PROVIDER === 'openai') {
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('[config] FATAL: LLM_PROVIDER=openai but OPENAI_API_KEY is not set.');
+    console.error('[config] Set OPENAI_API_KEY in server/.env.');
     process.exit(1);
   }
 }
@@ -21,8 +39,13 @@ if (process.env.AUTH_REQUIRED !== 'false') {
 }
 
 export const config = {
-  COPILOT_ENVIRONMENT_ID: process.env.COPILOT_ENVIRONMENT_ID!,
-  COPILOT_AGENT_SCHEMA_NAME: process.env.COPILOT_AGENT_SCHEMA_NAME!,
+  // LLM Provider (Phase 23+)
+  LLM_PROVIDER: LLM_PROVIDER as 'copilot' | 'openai',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  OPENAI_MODEL: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+  // Copilot Studio — required only when LLM_PROVIDER=copilot
+  COPILOT_ENVIRONMENT_ID: process.env.COPILOT_ENVIRONMENT_ID ?? '',
+  COPILOT_AGENT_SCHEMA_NAME: process.env.COPILOT_AGENT_SCHEMA_NAME ?? '',
   COPILOT_TENANT_ID: process.env.COPILOT_TENANT_ID,
   COPILOT_APP_ID: process.env.COPILOT_APP_ID,
   COPILOT_CLIENT_SECRET: process.env.COPILOT_CLIENT_SECRET,

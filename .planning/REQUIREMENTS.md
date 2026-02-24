@@ -9,7 +9,7 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 
 ### Provider Abstraction
 
-- [ ] **PROV-01**: Server defines `LlmProvider` interface with `startSession`, `sendMessage`, `sendCardAction` methods returning `NormalizedMessage[]`
+- [x] **PROV-01**: Server defines `LlmProvider` interface with `startSession`, `sendMessage`, `sendCardAction` methods returning `NormalizedMessage[]`
 - [ ] **PROV-02**: `CopilotProvider` wraps existing `CopilotStudioClient` behind `LlmProvider` interface
 - [ ] **PROV-03**: `WorkflowOrchestrator` depends on `LlmProvider` interface, not `CopilotStudioClient` directly
 - [ ] **PROV-04**: Provider factory selects backend based on `LLM_PROVIDER` config value
@@ -26,9 +26,9 @@ Requirements for v1.7: OpenAI Dev/Demo Backend. Each maps to roadmap phases.
 
 ### Configuration
 
-- [ ] **CONF-01**: `LLM_PROVIDER` env var selects backend (`copilot` default, `openai` alternative)
-- [ ] **CONF-02**: `COPILOT_*` env vars required only when `LLM_PROVIDER=copilot`
-- [ ] **CONF-03**: `OPENAI_API_KEY` required only when `LLM_PROVIDER=openai`
+- [x] **CONF-01**: `LLM_PROVIDER` env var selects backend (`copilot` default, `openai` alternative)
+- [x] **CONF-02**: `COPILOT_*` env vars required only when `LLM_PROVIDER=copilot`
+- [x] **CONF-03**: `OPENAI_API_KEY` required only when `LLM_PROVIDER=openai`
 - [ ] **CONF-04**: Server starts with `LLM_PROVIDER=openai` + `OPENAI_API_KEY` + `AUTH_REQUIRED=false` (3 env vars)
 - [ ] **CONF-05**: Health endpoint reports active provider name and model
 
@@ -74,10 +74,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PROV-01 | Phase 23 | Pending |
-| CONF-01 | Phase 23 | Pending |
-| CONF-02 | Phase 23 | Pending |
-| CONF-03 | Phase 23 | Pending |
+| PROV-01 | Phase 23 | Complete |
+| CONF-01 | Phase 23 | Complete |
+| CONF-02 | Phase 23 | Complete |
+| CONF-03 | Phase 23 | Complete |
 | PROV-02 | Phase 24 | Pending |
 | COMPAT-03 | Phase 24 | Pending |
 | PROV-03 | Phase 25 | Pending |

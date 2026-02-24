@@ -137,6 +137,10 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 - ✓ Integration test: full workflow lifecycle simulation with 2 phase transitions, 2 input modes, and reset verification (TEST-04) — v1.6 Phase 22
 - ✓ 30/30 v1.6 requirements verified green — v1.6 Phase 22
 
+- ✓ LlmProvider interface with startSession/sendMessage/sendCardAction returning NormalizedMessage[] — v1.7 Phase 23
+- ✓ LLM_PROVIDER env var with conditional provider validation (Copilot or OpenAI) — v1.7 Phase 23
+- ✓ OPENAI_API_KEY required only when LLM_PROVIDER=openai, Copilot vars only when LLM_PROVIDER=copilot — v1.7 Phase 23
+
 ### Active
 
 ## Current Milestone: v1.7 OpenAI Dev/Demo Backend
@@ -256,6 +260,10 @@ Users can interact with a Copilot Studio agent through a polished chat UI that s
 | flattenData with dot-notation for nested objects | Intuitive display (address.street) up to 3 levels; deeper gets "View full data" JSON toggle | ✓ Good — handles arbitrary depth gracefully |
 | Confirmation Yes pill uses choicePillPrimary class | Visual hierarchy: primary action (Yes) stands out from neutral (No) | ✓ Good — consistent with existing button patterns |
 | Exported reducer/initialState from useChatApi for integration testing | Avoids MSAL mocking; tests reducer state transitions + component rendering directly | ✓ Good — clean separation, no behavioral change |
+| LlmProvider methods return Promise<NormalizedMessage[]> | Implementations normalize internally; callers never see raw SDK types | ✓ Good — clean provider abstraction |
+| LLM_PROVIDER defaults to 'copilot' | Existing deployments without new env var continue unchanged | ✓ Good — full backward compatibility |
+| Conditional env var validation per provider | Copilot vars only required for copilot, OpenAI vars only for openai | ✓ Good — fail-loud on missing vars |
+| COPILOT_ fields use `?? ''` instead of `!` assertion | Validation is now conditional so `!` assertion is unsafe | ✓ Good — no runtime assertion errors |
 
 ---
-*Last updated: 2026-02-23 after v1.7 milestone started*
+*Last updated: 2026-02-24 after Phase 23 (LLM Provider Interface + Config)*
