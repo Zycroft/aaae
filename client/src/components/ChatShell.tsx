@@ -2,7 +2,7 @@ import './chat.css';
 import { useMsal } from '@azure/msal-react';
 import { useCallback } from 'react';
 import { useChatApi } from '../hooks/useChatApi.js';
-import { useTheme } from '../hooks/useTheme.js';
+import { useTheme, type Theme } from '../hooks/useTheme.js';
 import { TranscriptView } from './TranscriptView.js';
 import { ChatInput } from './ChatInput.js';
 import { ThemeToggle } from './ThemeToggle.js';
@@ -83,7 +83,7 @@ function ChatShellUI({
 }: {
   getToken: () => Promise<string>;
   onSignOut?: () => void;
-  theme: string;
+  theme: Theme;
   onToggleTheme: () => void;
 }) {
   const { messages, isLoading, error, sendMessage, cardAction, workflowState, resetConversation } = useChatApi({ getToken });
