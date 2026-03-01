@@ -31,16 +31,19 @@ export function createConversationStore(): ConversationStore {
   const redisUrl = config.REDIS_URL;
 
   if (redisUrl) {
-    // Validate TLS scheme — Azure Cache for Redis requires rediss://
+    // Validate scheme — accept rediss:// (Azure TLS) or redis:// (local Docker)
     const url = new URL(redisUrl);
-    if (url.protocol !== 'rediss:') {
+    if (url.protocol !== 'rediss:' && url.protocol !== 'redis:') {
       console.error(
-        `[STORE] FATAL: Invalid REDIS_URL scheme "${url.protocol}". Azure Cache requires rediss:// (TLS on port 6380).`
+        `[STORE] FATAL: Invalid REDIS_URL scheme "${url.protocol}". Expected redis:// or rediss:// (TLS).`
       );
       process.exit(1);
     }
 
+    const useTls = url.protocol === 'rediss:';
+
     redisClient = new Redis(redisUrl, {
+      tls: useTls ? {} : undefined,
       commandTimeout: config.REDIS_TIMEOUT,
       connectTimeout: 10000, // 10 seconds for initial connection
       maxRetriesPerRequest: 3,
