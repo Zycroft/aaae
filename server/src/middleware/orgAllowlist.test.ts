@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from 'express';
 vi.mock('../config.js', () => ({
   config: {
     ALLOWED_TENANT_IDS: ['tenant-a', 'tenant-b'],
+    AUTH_REQUIRED: true,
   },
 }));
 
@@ -39,8 +40,9 @@ function makeNext(): NextFunction {
 describe('orgAllowlist', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset ALLOWED_TENANT_IDS to default for each test
+    // Reset config to default for each test
     vi.mocked(config).ALLOWED_TENANT_IDS = ['tenant-a', 'tenant-b'] as unknown as readonly string[] & string[];
+    vi.mocked(config).AUTH_REQUIRED = true as unknown as boolean;
   });
 
   it('calls next() when tid is in ALLOWED_TENANT_IDS', () => {
@@ -113,6 +115,20 @@ describe('orgAllowlist', () => {
   it('calls next() when tid matches one of multiple entries in ALLOWED_TENANT_IDS', () => {
     // tenant-b is the second entry in the default mock
     const req = makeReq('tenant-b');
+    const res = makeRes();
+    const next = makeNext();
+
+    orgAllowlist(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('calls next() without checking tenant when AUTH_REQUIRED=false', () => {
+    vi.mocked(config).AUTH_REQUIRED = false as unknown as boolean;
+    vi.mocked(config).ALLOWED_TENANT_IDS = [] as unknown as readonly string[] & string[];
+
+    const req = makeReq(undefined); // no user at all
     const res = makeRes();
     const next = makeNext();
 

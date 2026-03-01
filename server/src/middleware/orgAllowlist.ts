@@ -15,6 +15,12 @@ import { config } from '../config.js';
  * ORG-01, ORG-02, ORG-03, ORG-04
  */
 export function orgAllowlist(req: Request, res: Response, next: NextFunction): void {
+  // AUTH_REQUIRED=false: skip tenant check (matches authMiddleware bypass)
+  if (!config.AUTH_REQUIRED) {
+    next();
+    return;
+  }
+
   // Defensive check: req.user should always be set by authMiddleware, but guard anyway
   if (!req.user) {
     res.status(403).json({
