@@ -56,7 +56,19 @@ export const initialState: State = {
 export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'INIT_CONVERSATION':
-      return { ...state, conversationId: action.conversationId };
+      return {
+        ...state,
+        conversationId: action.conversationId,
+        messages: [
+          {
+            id: 'welcome',
+            role: 'assistant',
+            kind: 'text',
+            text: 'Hello! How can I help you today?',
+            status: 'sent',
+          },
+        ],
+      };
 
     case 'ADD_OPTIMISTIC_MESSAGE':
       return { ...state, messages: [...state.messages, action.message] };

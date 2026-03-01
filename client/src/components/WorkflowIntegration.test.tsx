@@ -91,7 +91,7 @@ describe('Workflow Integration', () => {
       expect(state.workflowState).toEqual(phase1State);
       expect(state.workflowState?.status).toBe('active');
       expect(state.workflowState?.suggestedInputType).toBe('choice');
-      expect(state.messages).toHaveLength(1);
+      expect(state.messages).toHaveLength(2); // welcome + bot message
 
       // WorkflowProgress shows phase label and determinate bar
       const progressHtml = renderToStaticMarkup(<WorkflowProgress workflowState={phase1State} />);
@@ -189,7 +189,7 @@ describe('Workflow Integration', () => {
 
       // Verify state has data
       expect(state.conversationId).toBe('test-conv-123');
-      expect(state.messages).toHaveLength(1);
+      expect(state.messages).toHaveLength(2); // welcome + user message
       expect(state.workflowState).toBeTruthy();
 
       // Reset
