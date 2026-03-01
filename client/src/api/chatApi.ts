@@ -4,11 +4,22 @@ import type { NormalizedMessage, WorkflowState } from '@copilot-chat/shared';
  * Raw HTTP fetch wrappers for the chat API.
  * No state, no retry logic — those live in useChatApi.
  * The Vite dev server proxies /api to http://localhost:3001 (configured in vite.config.ts).
+ * In production (subpath deploy), BASE_URL prefixes API paths so nginx routes them correctly.
  *
  * Each function accepts a `token` string and injects it as the Authorization: Bearer header.
  * Token acquisition is the responsibility of the caller (ChatShell via useMsal).
  * CAUTH-05
  */
+
+/** Compile-time constant set by Vite `define` (vite.config.ts) and Jest `globals` */
+declare const __API_BASE__: string;
+
+/** Resolve API path using the base URL (e.g. "/aaae/" in production, "/" in dev) */
+function apiUrl(path: string): string {
+  const base = typeof __API_BASE__ !== 'undefined' ? __API_BASE__ : '/';
+  // base ends with '/', path starts with '/' — avoid double slash
+  return `${base}${path.replace(/^\//, '')}`;
+}
 
 /**
  * Starts a new Copilot Studio conversation.
@@ -19,7 +30,7 @@ export async function startConversation(
   token: string,
   signal?: AbortSignal,
 ): Promise<{ conversationId: string; workflowState?: WorkflowState }> {
-  const response = await fetch('/api/chat/start', {
+  const response = await fetch(apiUrl('/api/chat/start'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -49,7 +60,7 @@ export async function sendMessage(
   token: string,
   signal?: AbortSignal,
 ): Promise<{ conversationId: string; messages: NormalizedMessage[]; workflowState?: WorkflowState }> {
-  const response = await fetch('/api/chat/send', {
+  const response = await fetch(apiUrl('/api/chat/send'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -84,7 +95,7 @@ export async function sendCardAction(
   token: string,
   signal?: AbortSignal,
 ): Promise<{ conversationId: string; messages: NormalizedMessage[]; workflowState?: WorkflowState }> {
-  const response = await fetch('/api/chat/card-action', {
+  const response = await fetch(apiUrl('/api/chat/card-action'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

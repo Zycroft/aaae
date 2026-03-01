@@ -2,6 +2,9 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  globals: {
+    __API_BASE__: '/',
+  },
   roots: ['<rootDir>/src'],
   moduleNameMapper: {
     // Map workspace package imports to source
