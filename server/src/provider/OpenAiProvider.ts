@@ -29,7 +29,7 @@ const WORKFLOW_RESPONSE_SCHEMA = {
   type: 'json_schema' as const,
   json_schema: {
     name: 'workflow_response',
-    strict: true,
+    strict: false,
     schema: {
       type: 'object',
       properties: {
@@ -38,12 +38,11 @@ const WORKFLOW_RESPONSE_SCHEMA = {
           enum: ['ask', 'research', 'confirm', 'complete', 'error'],
         },
         prompt: { type: 'string' },
-        data: { type: 'object', additionalProperties: true },
+        data: { type: 'object' },
         confidence: { type: 'number' },
         citations: { type: 'array', items: { type: 'string' } },
       },
       required: ['action', 'prompt', 'data', 'confidence', 'citations'],
-      additionalProperties: false,
     },
   },
 };
