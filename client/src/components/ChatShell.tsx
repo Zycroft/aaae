@@ -9,7 +9,7 @@ import { ThemeToggle } from './ThemeToggle.js';
 import { MetadataPane } from './MetadataPane.js';
 import { WorkflowProgress } from './WorkflowProgress.js';
 import { WorkflowComplete } from './WorkflowComplete.js';
-import { loginRequest, msalInstance } from '../auth/msalConfig.js';
+import { authEnabled, loginRequest, msalInstance } from '../auth/msalConfig.js';
 
 /**
  * Top-level chat UI shell.
@@ -17,12 +17,18 @@ import { loginRequest, msalInstance } from '../auth/msalConfig.js';
  * Manages theme via useTheme hook (UI-13).
  * Layout uses responsive split-pane grid (UI-01) with metadata drawer slot.
  *
- * Acquires Bearer tokens silently before each API call (CAUTH-04, CAUTH-07).
- * Provides sign-out capability (CAUTH-06).
+ * When authEnabled=false, bypasses MSAL entirely and uses a stub token.
+ * When authEnabled=true, acquires Bearer tokens silently before each API call.
  *
  * UI-01, UI-02, UI-03, UI-04, UI-05, UI-07, UI-09, UI-13, SHELL-01, SHELL-02, CAUTH-04, CAUTH-05, CAUTH-06, CAUTH-07
  */
 export function ChatShell() {
+  if (!authEnabled) return <ChatShellNoAuth />;
+  return <ChatShellAuth />;
+}
+
+/** Chat shell with MSAL authentication — only rendered when authEnabled=true */
+function ChatShellAuth() {
   const { instance, accounts } = useMsal();
   const { theme, toggle } = useTheme();
 
@@ -50,11 +56,6 @@ export function ChatShell() {
     }
   }, [instance, accounts]);
 
-  /**
-   * Signs the user out: clears MSAL token cache, redirects browser to sign-in page.
-   * No confirmation dialog per CONTEXT.md decision.
-   * CAUTH-06
-   */
   function handleSignOut() {
     void msalInstance.logoutRedirect({
       account: accounts[0],
@@ -62,6 +63,29 @@ export function ChatShell() {
     });
   }
 
+  return <ChatShellUI getToken={getToken} onSignOut={handleSignOut} theme={theme} onToggleTheme={toggle} />;
+}
+
+/** Chat shell without authentication — rendered when authEnabled=false */
+function ChatShellNoAuth() {
+  const { theme, toggle } = useTheme();
+  const getToken = useCallback(async () => 'no-auth', []);
+
+  return <ChatShellUI getToken={getToken} theme={theme} onToggleTheme={toggle} />;
+}
+
+/** Shared chat UI rendering — receives auth-related callbacks as props */
+function ChatShellUI({
+  getToken,
+  onSignOut,
+  theme,
+  onToggleTheme,
+}: {
+  getToken: () => Promise<string>;
+  onSignOut?: () => void;
+  theme: string;
+  onToggleTheme: () => void;
+}) {
   const { messages, isLoading, error, sendMessage, cardAction, workflowState, resetConversation } = useChatApi({ getToken });
 
   return (
@@ -85,15 +109,17 @@ export function ChatShell() {
             </div>
           )}
           <div className="chatHeader">
-            <ThemeToggle theme={theme} onToggle={toggle} />
-            <button
-              type="button"
-              className="signOutButton"
-              onClick={handleSignOut}
-              aria-label="Sign out"
-            >
-              Sign out
-            </button>
+            <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+            {onSignOut && (
+              <button
+                type="button"
+                className="signOutButton"
+                onClick={onSignOut}
+                aria-label="Sign out"
+              >
+                Sign out
+              </button>
+            )}
           </div>
           <WorkflowProgress workflowState={workflowState} />
           {workflowState?.status === 'completed' ? (

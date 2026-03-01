@@ -3,6 +3,7 @@ import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
 import { SkeletonBubble } from '../components/SkeletonBubble.js';
 import { SignInPage } from './SignInPage.js';
+import { authEnabled } from './msalConfig.js';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -11,7 +12,10 @@ interface AuthGuardProps {
 /**
  * Gates the app behind MSAL authentication.
  *
- * State machine:
+ * When authEnabled=false (no Azure credentials at build time), renders children
+ * directly — no authentication check, no MSAL hooks.
+ *
+ * State machine (when auth enabled):
  * 1. MSAL initializing (inProgress !== None) → show skeleton (same pattern as message loading)
  * 2. Not authenticated + MSAL idle → show SignInPage
  * 3. Authenticated → show welcome toast for ~1 second (first time after redirect), then children
@@ -23,6 +27,12 @@ interface AuthGuardProps {
  * CAUTH-01, CAUTH-02, CAUTH-03
  */
 export function AuthGuard({ children }: AuthGuardProps) {
+  if (!authEnabled) return <>{children}</>;
+  return <AuthGuardMsal>{children}</AuthGuardMsal>;
+}
+
+/** Inner component that uses MSAL hooks — only rendered when authEnabled=true */
+function AuthGuardMsal({ children }: AuthGuardProps) {
   const { inProgress, accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const [showWelcome, setShowWelcome] = useState(false);
