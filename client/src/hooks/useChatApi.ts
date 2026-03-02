@@ -64,7 +64,7 @@ export function reducer(state: State, action: Action): State {
             id: 'welcome',
             role: 'assistant',
             kind: 'text',
-            text: 'Hello! How can I help you today?',
+            text: 'Hello! I\'m your airport planning and procurement assistant. How can I help you today?',
             status: 'sent',
           },
         ],
